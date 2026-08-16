@@ -1,0 +1,17 @@
+# OS / editor
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/
+
+# Build artifacts
+/dist/
+*.zip
+
+# Logs / env
+*.log
+.env
+
+# WordPress local test stacks
+/vendor/
+node_modules/

@@ -1,0 +1,75 @@
+.aieh-wrap h1 .button { margin-left: 12px; vertical-align: middle; }
+
+.aieh-inline-status { margin-left: 8px; font-style: italic; }
+.aieh-inline-status.is-ok { color: #1a7f37; font-style: normal; }
+.aieh-inline-status.is-error { color: #b32d2e; font-style: normal; }
+
+.aieh-list { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+
+.aieh-card {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-left: 4px solid #2271b1;
+	border-radius: 4px;
+	padding: 14px 16px;
+	box-shadow: 0 1px 1px rgba( 0, 0, 0, 0.04 );
+}
+.aieh-card[data-status="replied"] { border-left-color: #1a7f37; }
+.aieh-card[data-status="new"] { border-left-color: #d63638; }
+
+.aieh-card-head {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: center;
+	font-size: 13px;
+	color: #50575e;
+}
+.aieh-card-head .aieh-date { margin-left: auto; }
+
+.aieh-badge {
+	text-transform: uppercase;
+	font-size: 10px;
+	letter-spacing: .5px;
+	padding: 2px 8px;
+	border-radius: 10px;
+	background: #f0f0f1;
+	color: #3c434a;
+}
+.aieh-status-new { background: #fcf0f1; color: #b32d2e; }
+.aieh-status-replied { background: #edfaef; color: #1a7f37; }
+
+.aieh-subject { font-size: 15px; font-weight: 600; margin: 6px 0; }
+
+.aieh-summary {
+	background: #f6f7f7;
+	border-radius: 4px;
+	padding: 8px 10px;
+	margin: 8px 0;
+	font-size: 13px;
+	color: #1d2327;
+}
+.aieh-summary.is-empty { display: none; }
+
+.aieh-body summary { cursor: pointer; color: #2271b1; font-size: 13px; }
+.aieh-body pre {
+	white-space: pre-wrap;
+	word-break: break-word;
+	background: #f6f7f7;
+	padding: 10px;
+	border-radius: 4px;
+	max-height: 320px;
+	overflow: auto;
+	font-size: 12px;
+}
+
+.aieh-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+.aieh-draft-area { margin-top: 12px; }
+.aieh-draft-text { width: 100%; font-family: inherit; }
+
+.aieh-card-status { margin-top: 8px; font-size: 12px; }
+.aieh-card-status.is-error { color: #b32d2e; }
+.aieh-card-status.is-ok { color: #1a7f37; }
+
+.aieh-faq-add { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
