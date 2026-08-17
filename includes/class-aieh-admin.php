@@ -28,6 +28,7 @@ class AIEH_Admin {
 		);
 		add_submenu_page( self::SLUG, __( 'Inbox', 'ai-email-helper' ), __( 'Inbox', 'ai-email-helper' ), 'manage_options', self::SLUG, array( $this, 'render_inbox' ) );
 		add_submenu_page( self::SLUG, __( 'FAQ Sources', 'ai-email-helper' ), __( 'FAQ Sources', 'ai-email-helper' ), 'manage_options', self::SLUG . '-faq', array( $this, 'render_faq' ) );
+		add_submenu_page( self::SLUG, __( 'Learning', 'ai-email-helper' ), __( 'Learning', 'ai-email-helper' ), 'manage_options', self::SLUG . '-learning', array( $this, 'render_learning' ) );
 		add_submenu_page( self::SLUG, __( 'Settings', 'ai-email-helper' ), __( 'Settings', 'ai-email-helper' ), 'manage_options', self::SLUG . '-settings', array( $this, 'render_settings' ) );
 	}
 
@@ -91,6 +92,13 @@ class AIEH_Admin {
 	 */
 	public function render_faq() {
 		require AIEH_PLUGIN_DIR . 'admin/views/faq.php';
+	}
+
+	/**
+	 * Learning page.
+	 */
+	public function render_learning() {
+		require AIEH_PLUGIN_DIR . 'admin/views/learning.php';
 	}
 
 	/**

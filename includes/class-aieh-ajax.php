@@ -18,13 +18,17 @@ class AIEH_Ajax {
 	 */
 	public function register() {
 		$actions = array(
-			'aieh_test_imap'  => 'test_imap',
-			'aieh_fetch'      => 'fetch',
-			'aieh_summarize'  => 'summarize',
-			'aieh_draft'      => 'draft',
-			'aieh_send'       => 'send',
-			'aieh_scan_faq'   => 'scan_faq',
-			'aieh_delete_faq' => 'delete_faq',
+			'aieh_test_imap'     => 'test_imap',
+			'aieh_fetch'         => 'fetch',
+			'aieh_summarize'     => 'summarize',
+			'aieh_draft'         => 'draft',
+			'aieh_send'          => 'send',
+			'aieh_scan_faq'      => 'scan_faq',
+			'aieh_delete_faq'    => 'delete_faq',
+			'aieh_update_faq'    => 'update_faq',
+			'aieh_update_learning' => 'update_learning',
+			'aieh_delete_learning' => 'delete_learning',
+			'aieh_ai_revise'     => 'ai_revise',
 		);
 		foreach ( $actions as $action => $method ) {
 			add_action( "wp_ajax_{$action}", array( $this, $method ) );
@@ -151,9 +155,85 @@ class AIEH_Ajax {
 	public function delete_faq() {
 		$this->guard();
 		$id = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
-		global $wpdb;
-		$table = AIEH_Activator::faqs_table();
-		$wpdb->delete( $table, array( 'id' => $id ), array( '%d' ) ); // phpcs:ignore WordPress.DB
+		AIEH_Faq_Scanner::delete( $id );
 		wp_send_json_success( array( 'message' => __( 'FAQ source removed.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Update a FAQ entry's title/content directly.
+	 */
+	public function update_faq() {
+		$this->guard();
+		$id      = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		$title   = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
+		$content = isset( $_POST['content'] ) ? sanitize_textarea_field( wp_unslash( $_POST['content'] ) ) : '';
+
+		if ( ! $id || '' === trim( $content ) ) {
+			wp_send_json_error( array( 'message' => __( 'Content cannot be empty.', 'ai-email-helper' ) ) );
+		}
+
+		AIEH_Faq_Scanner::update( $id, $title, $content );
+		wp_send_json_success( array( 'message' => __( 'FAQ entry saved.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Update a learning entry (e.g. when the underlying facts changed).
+	 */
+	public function update_learning() {
+		$this->guard();
+		$id             = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		$prompt_summary = isset( $_POST['prompt_summary'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt_summary'] ) ) : '';
+		$user_reply     = isset( $_POST['user_reply'] ) ? sanitize_textarea_field( wp_unslash( $_POST['user_reply'] ) ) : '';
+		$tone_notes     = isset( $_POST['tone_notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['tone_notes'] ) ) : '';
+
+		if ( ! $id || '' === trim( $user_reply ) ) {
+			wp_send_json_error( array( 'message' => __( 'Reply text cannot be empty.', 'ai-email-helper' ) ) );
+		}
+
+		AIEH_Learning_Store::update( $id, $prompt_summary, $user_reply, $tone_notes );
+		wp_send_json_success( array( 'message' => __( 'Learning entry saved.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Delete a learning entry.
+	 */
+	public function delete_learning() {
+		$this->guard();
+		$id = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		AIEH_Learning_Store::delete( $id );
+		wp_send_json_success( array( 'message' => __( 'Learning entry removed.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Generic AI-assisted revision: rewrite a piece of text per a free-form instruction.
+	 * Used to update learning replies / FAQ content when underlying facts change.
+	 * Returns the suggestion only — caller must still Save to persist it.
+	 */
+	public function ai_revise() {
+		$this->guard();
+		$text        = isset( $_POST['text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['text'] ) ) : '';
+		$instruction = isset( $_POST['instruction'] ) ? sanitize_textarea_field( wp_unslash( $_POST['instruction'] ) ) : '';
+
+		if ( '' === trim( $text ) || '' === trim( $instruction ) ) {
+			wp_send_json_error( array( 'message' => __( 'Provide both the text and an instruction.', 'ai-email-helper' ) ) );
+		}
+
+		$messages = array(
+			array(
+				'role'    => 'system',
+				'content' => 'You revise text according to the instruction given. Keep the overall tone and style unless told otherwise. Output only the revised text, with no preamble, no quotes, and no explanation.',
+			),
+			array(
+				'role'    => 'user',
+				'content' => "Original text:\n{$text}\n\nInstruction: {$instruction}",
+			),
+		);
+
+		$revised = AIEH_OpenAI_Client::chat( $messages, array( 'max_tokens' => 700, 'temperature' => 0.3 ) );
+		if ( is_wp_error( $revised ) ) {
+			wp_send_json_error( array( 'message' => $revised->get_error_message() ) );
+		}
+
+		wp_send_json_success( array( 'revised' => $revised ) );
 	}
 }

@@ -102,6 +102,83 @@ class AIEH_Faq_Scanner {
 	}
 
 	/**
+	 * Fetch one FAQ source by id.
+	 *
+	 * @param int $id Entry id.
+	 * @return object|null
+	 */
+	public static function get( $id ) {
+		global $wpdb;
+		$table = AIEH_Activator::faqs_table();
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", (int) $id ) ); // phpcs:ignore WordPress.DB
+	}
+
+	/**
+	 * Search/list FAQ sources, newest scan first.
+	 *
+	 * @param string $search Optional search term (matches title/content/url).
+	 * @return array
+	 */
+	public static function search( $search = '' ) {
+		global $wpdb;
+		$table  = AIEH_Activator::faqs_table();
+		$search = trim( (string) $search );
+
+		if ( '' === $search ) {
+			return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY scanned_at DESC" ); // phpcs:ignore WordPress.DB
+		}
+
+		$like = '%' . $wpdb->esc_like( $search ) . '%';
+		return $wpdb->get_results( // phpcs:ignore WordPress.DB
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE title LIKE %s OR content LIKE %s OR source_url LIKE %s ORDER BY scanned_at DESC",
+				$like,
+				$like,
+				$like
+			)
+		);
+	}
+
+	/**
+	 * Update a FAQ entry's title/content directly (e.g. when facts changed).
+	 *
+	 * @param int    $id      Entry id.
+	 * @param string $title   Updated title.
+	 * @param string $content Updated content.
+	 * @return bool
+	 */
+	public static function update( $id, $title, $content ) {
+		global $wpdb;
+		$table   = AIEH_Activator::faqs_table();
+		$content = trim( (string) $content );
+		$words   = str_word_count( wp_strip_all_tags( $content ) );
+
+		return false !== $wpdb->update( // phpcs:ignore WordPress.DB
+			$table,
+			array(
+				'title'      => sanitize_text_field( $title ),
+				'content'    => $content,
+				'word_count' => $words,
+			),
+			array( 'id' => (int) $id ),
+			array( '%s', '%s', '%d' ),
+			array( '%d' )
+		);
+	}
+
+	/**
+	 * Delete a FAQ source.
+	 *
+	 * @param int $id Entry id.
+	 * @return bool
+	 */
+	public static function delete( $id ) {
+		global $wpdb;
+		$table = AIEH_Activator::faqs_table();
+		return false !== $wpdb->delete( $table, array( 'id' => (int) $id ), array( '%d' ) ); // phpcs:ignore WordPress.DB
+	}
+
+	/**
 	 * Return a concatenated knowledge snippet from active FAQs, capped in length.
 	 *
 	 * @param int $max_chars Maximum characters.

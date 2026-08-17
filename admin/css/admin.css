@@ -73,3 +73,17 @@
 .aieh-card-status.is-ok { color: #1a7f37; }
 
 .aieh-faq-add { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+
+.aieh-search-form { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+
+.aieh-field-label { display: block; font-weight: 600; font-size: 12px; margin: 10px 0 4px; }
+.aieh-learning-summary,
+.aieh-learning-reply,
+.aieh-learning-notes,
+.aieh-faq-edit-content { width: 100%; font-family: inherit; }
+.aieh-faq-edit-title { width: 100%; max-width: 500px; }
+
+.aieh-revise-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.aieh-revise-row input[type="text"] { flex: 1; }
+
+.aieh-faq-edit-row td { background: #f6f7f7; }
