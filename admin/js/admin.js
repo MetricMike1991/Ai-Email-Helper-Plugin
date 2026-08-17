@@ -47,6 +47,91 @@
 		} );
 	} );
 
+	/* ---- Inbox: sync unread from server ---- */
+	$( '#aieh-sync-unread' ).on( 'click', function () {
+		var $btn = $( this );
+		var $st = $( '#aieh-fetch-status' ).text( AIEH.i18n.working ).removeClass( 'is-error is-ok' );
+		busy( $btn, true );
+		post( 'aieh_sync_unread' ).done( function ( r ) {
+			if ( r.success ) {
+				$st.text( r.data.message ).addClass( 'is-ok' );
+				window.location.reload();
+			} else {
+				$st.text( r.data.message ).addClass( 'is-error' );
+			}
+		} ).always( function () {
+			busy( $btn, false );
+		} );
+	} );
+
+	/* ---- Inbox: mark read / unread (mirrors the IMAP server) ---- */
+	function setCardStatus( $card, status ) {
+		$card.attr( 'data-status', status );
+		$card.find( '.aieh-badge' )
+			.attr( 'class', 'aieh-badge aieh-status-' + status )
+			.text( status );
+		$card.find( '.aieh-mark-read' ).toggle( 'unread' === status );
+		$card.find( '.aieh-mark-unread' ).toggle( 'unread' !== status );
+	}
+
+	$( '.aieh-list' ).on( 'click', '.aieh-mark-read', function () {
+		var $card = $( this ).closest( '.aieh-card' );
+		var $status = $card.find( '.aieh-card-status' ).text( AIEH.i18n.working );
+		post( 'aieh_mark_read', { id: $card.data( 'id' ) } ).done( function ( r ) {
+			if ( r.success ) {
+				setCardStatus( $card, 'read' );
+				$status.text( '' );
+			} else {
+				$status.text( r.data.message ).addClass( 'is-error' );
+			}
+		} );
+	} );
+
+	$( '.aieh-list' ).on( 'click', '.aieh-mark-unread', function () {
+		var $card = $( this ).closest( '.aieh-card' );
+		var $status = $card.find( '.aieh-card-status' ).text( AIEH.i18n.working );
+		post( 'aieh_mark_unread', { id: $card.data( 'id' ) } ).done( function ( r ) {
+			if ( r.success ) {
+				setCardStatus( $card, 'unread' );
+				$status.text( '' );
+			} else {
+				$status.text( r.data.message ).addClass( 'is-error' );
+			}
+		} );
+	} );
+
+	/* ---- Inbox: category tag ---- */
+	$( '.aieh-list' ).on( 'change', '.aieh-category-select', function () {
+		var $card = $( this ).closest( '.aieh-card' );
+		var $status = $card.find( '.aieh-card-status' ).text( AIEH.i18n.working );
+		post( 'aieh_set_category', { id: $card.data( 'id' ), category: $( this ).val() } ).done( function ( r ) {
+			if ( r.success ) {
+				$status.text( r.data.message ).removeClass( 'is-error' ).addClass( 'is-ok' );
+			} else {
+				$status.text( r.data.message ).removeClass( 'is-ok' ).addClass( 'is-error' );
+			}
+		} );
+	} );
+
+	/* ---- Inbox: move to folder ---- */
+	$( '.aieh-list' ).on( 'change', '.aieh-move-select', function () {
+		var folder = $( this ).val();
+		if ( ! folder ) {
+			return;
+		}
+		var $card = $( this ).closest( '.aieh-card' );
+		var $status = $card.find( '.aieh-card-status' ).text( AIEH.i18n.working );
+		post( 'aieh_move', { id: $card.data( 'id' ), folder: folder } ).done( function ( r ) {
+			if ( r.success ) {
+				$card.fadeOut( 200, function () {
+					$card.remove();
+				} );
+			} else {
+				$status.text( r.data.message ).addClass( 'is-error' );
+			}
+		} );
+	} );
+
 	/* ---- Inbox: per-card actions ---- */
 	$( '.aieh-list' ).on( 'click', '.aieh-summarize', function () {
 		var $card = $( this ).closest( '.aieh-card' );
@@ -98,6 +183,7 @@
 		post( 'aieh_send', { id: id, body: body } ).done( function ( r ) {
 			if ( r.success ) {
 				$status.text( r.data.message ).addClass( 'is-ok' );
+				setCardStatus( $card, 'replied' );
 			} else {
 				$status.text( r.data.message ).addClass( 'is-error' );
 			}

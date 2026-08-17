@@ -126,6 +126,212 @@ class AIEH_Imap_Client {
 	}
 
 	/**
+	 * Set or clear the \Seen flag on the server for a cached message, and mirror
+	 * the change locally. $seen = true marks read, false marks unread.
+	 *
+	 * @param int  $message_id Local message id.
+	 * @param bool $seen       Desired read state.
+	 * @return true|WP_Error
+	 */
+	public static function set_seen( $message_id, $seen ) {
+		$msg = self::get_local( $message_id );
+		if ( ! $msg ) {
+			return new WP_Error( 'aieh_no_message', __( 'Message not found.', 'ai-email-helper' ) );
+		}
+		$stream = self::connect( $msg->folder );
+		if ( is_wp_error( $stream ) ) {
+			return $stream;
+		}
+
+		$seq = $msg->imap_uid . ':' . $msg->imap_uid;
+		if ( $seen ) {
+			imap_setflag_full( $stream, $seq, '\\Seen', ST_UID );
+		} else {
+			imap_clearflag_full( $stream, $seq, '\\Seen', ST_UID );
+		}
+		imap_errors();
+		imap_close( $stream );
+
+		// Do not downgrade a 'replied' message when merely toggling read state.
+		$new_status = $seen ? 'read' : 'unread';
+		if ( 'replied' === $msg->status && $seen ) {
+			$new_status = 'replied';
+		}
+		self::update_local_status( $message_id, $new_status );
+		return true;
+	}
+
+	/**
+	 * Mark a message answered (and seen) on the server after a reply is sent.
+	 * Best-effort: the local status is set regardless of the IMAP result.
+	 *
+	 * @param int $message_id Local message id.
+	 */
+	public static function mark_replied( $message_id ) {
+		$msg = self::get_local( $message_id );
+		if ( ! $msg ) {
+			return;
+		}
+		$stream = self::connect( $msg->folder );
+		if ( ! is_wp_error( $stream ) ) {
+			$seq = $msg->imap_uid . ':' . $msg->imap_uid;
+			imap_setflag_full( $stream, $seq, '\\Answered \\Seen', ST_UID );
+			imap_errors();
+			imap_close( $stream );
+		}
+		self::update_local_status( $message_id, 'replied' );
+	}
+
+	 *
+	 * @param bool $force Bypass the cache.
+	 * @return array|WP_Error List of folder names (e.g. INBOX, INBOX.Sent).
+	 */
+	public static function list_folders( $force = false ) {
+		$cached = get_transient( 'aieh_folders' );
+		if ( ! $force && is_array( $cached ) ) {
+			return $cached;
+		}
+		$stream = self::connect();
+		if ( is_wp_error( $stream ) ) {
+			return $stream;
+		}
+		$s       = AIEH_Settings::all();
+		$ref     = self::mailbox_string( $s, '' );
+		$mboxes  = imap_list( $stream, $ref, '*' );
+		$folders = array();
+		if ( is_array( $mboxes ) ) {
+			foreach ( $mboxes as $mbox ) {
+				// Strip the {host...} prefix, keep just the folder path.
+				$decoded = imap_utf7_decode( $mbox );
+				$name    = preg_replace( '/^\{[^}]*\}/', '', is_string( $decoded ) ? $decoded : $mbox );
+				if ( '' !== $name ) {
+					$folders[] = $name;
+				}
+			}
+		}
+		imap_errors();
+		imap_close( $stream );
+		sort( $folders );
+		set_transient( 'aieh_folders', $folders, HOUR_IN_SECONDS );
+		return $folders;
+	}
+
+	/**
+	 * Move a cached message to another folder on the server, then drop it from
+	 * the local INBOX cache.
+	 *
+	 * @param int    $message_id Local message id.
+	 * @param string $target     Destination folder name.
+	 * @return true|WP_Error
+	 */
+	public static function move_message( $message_id, $target ) {
+		$msg = self::get_local( $message_id );
+		if ( ! $msg ) {
+			return new WP_Error( 'aieh_no_message', __( 'Message not found.', 'ai-email-helper' ) );
+		}
+		if ( '' === trim( (string) $target ) ) {
+			return new WP_Error( 'aieh_no_folder', __( 'No destination folder given.', 'ai-email-helper' ) );
+		}
+		$stream = self::connect( $msg->folder );
+		if ( is_wp_error( $stream ) ) {
+			return $stream;
+		}
+
+		$seq  = $msg->imap_uid . ':' . $msg->imap_uid;
+		$moved = imap_mail_move( $stream, $seq, $target, CP_UID );
+		if ( $moved ) {
+			imap_expunge( $stream );
+		}
+		$err = imap_last_error();
+		imap_errors();
+		imap_close( $stream );
+
+		if ( ! $moved ) {
+			return new WP_Error( 'aieh_move_failed', sprintf( /* translators: %s: error */ __( 'Move failed: %s', 'ai-email-helper' ), $err ? $err : 'unknown error' ) );
+		}
+
+		// Remove from local cache since it no longer lives in this folder.
+		global $wpdb;
+		$table = AIEH_Activator::messages_table();
+		$wpdb->delete( $table, array( 'id' => (int) $message_id ), array( '%d' ) ); // phpcs:ignore WordPress.DB
+		return true;
+	}
+
+	/**
+	 * Hybrid unread sync: pull any unseen messages from the server into the cache
+	 * and reconcile the read/unread status of cached INBOX messages to match the
+	 * server. Returns the number of unread messages after syncing, or WP_Error.
+	 *
+	 * @param string $folder Folder.
+	 * @return int|WP_Error
+	 */
+	public static function sync_unread( $folder = 'INBOX' ) {
+		$stream = self::connect( $folder );
+		if ( is_wp_error( $stream ) ) {
+			return $stream;
+		}
+
+		$unseen_uids = imap_search( $stream, 'UNSEEN', SE_UID );
+		$unseen_uids = is_array( $unseen_uids ) ? array_map( 'intval', $unseen_uids ) : array();
+		$unseen_set  = array_flip( $unseen_uids );
+
+		// Cache any unseen messages we don't already have.
+		foreach ( $unseen_uids as $uid ) {
+			if ( self::message_exists( $uid, $folder ) ) {
+				continue;
+			}
+			$msgno = imap_msgno( $stream, $uid );
+			if ( $msgno ) {
+				self::store_message( $stream, $msgno, $uid, $folder );
+			}
+		}
+
+		imap_errors();
+		imap_close( $stream );
+
+		// Reconcile local status: unread if in the unseen set, otherwise read
+		// (leave 'replied' messages untouched).
+		global $wpdb;
+		$table = AIEH_Activator::messages_table();
+		$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT id, imap_uid, status FROM {$table} WHERE folder = %s", $folder ) ); // phpcs:ignore WordPress.DB
+		foreach ( $rows as $row ) {
+			if ( 'replied' === $row->status ) {
+				continue;
+			}
+			$should = isset( $unseen_set[ (int) $row->imap_uid ] ) ? 'unread' : 'read';
+			if ( $should !== $row->status ) {
+				self::update_local_status( (int) $row->id, $should );
+			}
+		}
+
+		return count( $unseen_uids );
+	}
+
+	/**
+	 * Load a cached message row (id, uid, folder, status) by local id.
+	 *
+	 * @param int $message_id Local id.
+	 * @return object|null
+	 */
+	private static function get_local( $message_id ) {
+		global $wpdb;
+		$table = AIEH_Activator::messages_table();
+		return $wpdb->get_row( $wpdb->prepare( "SELECT id, imap_uid, folder, status FROM {$table} WHERE id = %d", (int) $message_id ) ); // phpcs:ignore WordPress.DB
+	}
+
+	/**
+	 * Update a cached message's local status column.
+	 *
+	 * @param int    $message_id Local id.
+	 * @param string $status     New status.
+	 */
+	private static function update_local_status( $message_id, $status ) {
+		global $wpdb;
+		$table = AIEH_Activator::messages_table();
+		$wpdb->update( $table, array( 'status' => $status ), array( 'id' => (int) $message_id ), array( '%s' ), array( '%d' ) ); // phpcs:ignore WordPress.DB
+	}
+
+	/**
 	 * Whether a message with the given UID/folder is already cached.
 	 */
 	private static function message_exists( $uid, $folder ) {
@@ -168,6 +374,15 @@ class AIEH_Imap_Client {
 
 		$received = isset( $o->date ) ? gmdate( 'Y-m-d H:i:s', strtotime( $o->date ) ) : current_time( 'mysql', true );
 
+		// Mirror the real server flags: answered > seen > unread.
+		if ( ! empty( $o->answered ) ) {
+			$status = 'replied';
+		} elseif ( ! empty( $o->seen ) ) {
+			$status = 'read';
+		} else {
+			$status = 'unread';
+		}
+
 		$table  = AIEH_Activator::messages_table();
 		$result = $wpdb->insert( // phpcs:ignore WordPress.DB
 			$table,
@@ -180,7 +395,7 @@ class AIEH_Imap_Client {
 				'to_email'    => isset( $o->to ) ? sanitize_text_field( $o->to ) : '',
 				'subject'     => sanitize_text_field( $subject ),
 				'body_text'   => wp_kses_post( $body ),
-				'status'      => 'new',
+				'status'      => $status,
 				'received_at' => $received,
 			),
 			array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
@@ -204,7 +419,7 @@ class AIEH_Imap_Client {
 
 		// Simple (non-multipart) message.
 		if ( empty( $structure->parts ) ) {
-			$body = imap_body( $stream, $msgno );
+			$body = imap_body( $stream, $msgno, FT_PEEK );
 			return self::decode_part( $body, isset( $structure->encoding ) ? $structure->encoding : 0 );
 		}
 
@@ -212,7 +427,7 @@ class AIEH_Imap_Client {
 		$html  = '';
 		foreach ( $structure->parts as $index => $part ) {
 			$part_no = (string) ( $index + 1 );
-			$data    = imap_fetchbody( $stream, $msgno, $part_no );
+			$data    = imap_fetchbody( $stream, $msgno, $part_no, FT_PEEK );
 			$decoded = self::decode_part( $data, isset( $part->encoding ) ? $part->encoding : 0 );
 			$subtype = isset( $part->subtype ) ? strtoupper( $part->subtype ) : '';
 

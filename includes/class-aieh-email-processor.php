@@ -56,9 +56,9 @@ class AIEH_Email_Processor {
 		$table = AIEH_Activator::messages_table();
 		$wpdb->update( // phpcs:ignore WordPress.DB
 			$table,
-			array( 'summary' => $summary, 'status' => 'read' ),
+			array( 'summary' => $summary ),
 			array( 'id' => (int) $message_id ),
-			array( '%s', '%s' ),
+			array( '%s' ),
 			array( '%d' )
 		);
 

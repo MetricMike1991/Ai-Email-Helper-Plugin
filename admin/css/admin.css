@@ -16,6 +16,8 @@
 }
 .aieh-card[data-status="replied"] { border-left-color: #1a7f37; }
 .aieh-card[data-status="new"] { border-left-color: #d63638; }
+.aieh-card[data-status="unread"] { border-left-color: #d63638; }
+.aieh-card[data-status="read"] { border-left-color: #2271b1; }
 
 .aieh-card-head {
 	display: flex;
@@ -38,6 +40,23 @@
 }
 .aieh-status-new { background: #fcf0f1; color: #b32d2e; }
 .aieh-status-replied { background: #edfaef; color: #1a7f37; }
+.aieh-status-unread { background: #fcf0f1; color: #b32d2e; }
+.aieh-status-read { background: #f0f0f1; color: #3c434a; }
+
+.aieh-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	margin: 8px 0 4px;
+	padding: 6px 0;
+	border-bottom: 1px solid #f0f0f1;
+	font-size: 12px;
+}
+.aieh-tool-label { color: #50575e; display: inline-flex; align-items: center; gap: 4px; }
+.aieh-toolbar select { font-size: 12px; }
+.aieh-filters { margin: 12px 0 4px; }
+.aieh-cat-filter { margin: 4px 0 12px; display: flex; gap: 8px; align-items: center; }
 
 .aieh-subject { font-size: 15px; font-weight: 600; margin: 6px 0; }
 

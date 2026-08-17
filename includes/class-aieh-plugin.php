@@ -69,7 +69,7 @@ class AIEH_Plugin {
 	private function auto_process_new() {
 		global $wpdb;
 		$table = AIEH_Activator::messages_table();
-		$ids   = $wpdb->get_col( "SELECT id FROM {$table} WHERE status = 'new' ORDER BY received_at DESC LIMIT 10" ); // phpcs:ignore WordPress.DB
+		$ids   = $wpdb->get_col( "SELECT id FROM {$table} WHERE status = 'unread' ORDER BY received_at DESC LIMIT 10" ); // phpcs:ignore WordPress.DB
 		foreach ( $ids as $id ) {
 			AIEH_Email_Processor::summarize( (int) $id );
 			if ( AIEH_Settings::get( 'auto_draft' ) ) {

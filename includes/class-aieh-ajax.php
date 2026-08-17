@@ -29,6 +29,12 @@ class AIEH_Ajax {
 			'aieh_update_learning' => 'update_learning',
 			'aieh_delete_learning' => 'delete_learning',
 			'aieh_ai_revise'     => 'ai_revise',
+			'aieh_mark_read'     => 'mark_read',
+			'aieh_mark_unread'   => 'mark_unread',
+			'aieh_move'          => 'move',
+			'aieh_folders'       => 'folders',
+			'aieh_sync_unread'   => 'sync_unread',
+			'aieh_set_category'  => 'set_category',
 		);
 		foreach ( $actions as $action => $method ) {
 			add_action( "wp_ajax_{$action}", array( $this, $method ) );
@@ -119,9 +125,8 @@ class AIEH_Ajax {
 
 		AIEH_Learning_Store::record( $id, $msg->subject, $body );
 
-		global $wpdb;
-		$table = AIEH_Activator::messages_table();
-		$wpdb->update( $table, array( 'status' => 'replied' ), array( 'id' => $id ), array( '%s' ), array( '%d' ) ); // phpcs:ignore WordPress.DB
+		// Mark answered + seen on the server and locally.
+		AIEH_Imap_Client::mark_replied( $id );
 
 		wp_send_json_success( array( 'message' => __( 'Reply sent and saved for learning.', 'ai-email-helper' ) ) );
 	}
@@ -235,5 +240,86 @@ class AIEH_Ajax {
 		}
 
 		wp_send_json_success( array( 'revised' => $revised ) );
+	}
+
+	/**
+	 * Mark a message read (\Seen) on the server + locally.
+	 */
+	public function mark_read() {
+		$this->guard();
+		$id     = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		$result = AIEH_Imap_Client::set_seen( $id, true );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'status' => 'read', 'message' => __( 'Marked as read.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Mark a message unread (clear \Seen) on the server + locally.
+	 */
+	public function mark_unread() {
+		$this->guard();
+		$id     = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		$result = AIEH_Imap_Client::set_seen( $id, false );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'status' => 'unread', 'message' => __( 'Marked as unread.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Move a message to another server folder.
+	 */
+	public function move() {
+		$this->guard();
+		$id     = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		$target = isset( $_POST['folder'] ) ? sanitize_text_field( wp_unslash( $_POST['folder'] ) ) : '';
+		$result = AIEH_Imap_Client::move_message( $id, $target );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'message' => sprintf( /* translators: %s: folder */ __( 'Moved to %s.', 'ai-email-helper' ), $target ) ) );
+	}
+
+	/**
+	 * Return the list of server folders (for the Move-to dropdown).
+	 */
+	public function folders() {
+		$this->guard();
+		$force   = ! empty( $_POST['force'] );
+		$folders = AIEH_Imap_Client::list_folders( $force );
+		if ( is_wp_error( $folders ) ) {
+			wp_send_json_error( array( 'message' => $folders->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'folders' => array_map( 'strval', $folders ) ) );
+	}
+
+	/**
+	 * Live hybrid sync of unread state from the server.
+	 */
+	public function sync_unread() {
+		$this->guard();
+		$count = AIEH_Imap_Client::sync_unread();
+		if ( is_wp_error( $count ) ) {
+			wp_send_json_error( array( 'message' => $count->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'unread' => (int) $count, 'message' => sprintf( /* translators: %d: count */ _n( '%d unread message synced.', '%d unread messages synced.', $count, 'ai-email-helper' ), $count ) ) );
+	}
+
+	/**
+	 * Set an internal category tag on a message (local only).
+	 */
+	public function set_category() {
+		$this->guard();
+		$id       = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		$category = isset( $_POST['category'] ) ? sanitize_text_field( wp_unslash( $_POST['category'] ) ) : '';
+		if ( ! $id ) {
+			wp_send_json_error( array( 'message' => __( 'Message not found.', 'ai-email-helper' ) ) );
+		}
+		global $wpdb;
+		$table = AIEH_Activator::messages_table();
+		$wpdb->update( $table, array( 'category' => substr( $category, 0, 60 ) ), array( 'id' => $id ), array( '%s' ), array( '%d' ) ); // phpcs:ignore WordPress.DB
+		wp_send_json_success( array( 'category' => $category, 'message' => __( 'Category updated.', 'ai-email-helper' ) ) );
 	}
 }
