@@ -25,6 +25,56 @@ class AIEH_Email_Processor {
 	}
 
 	/**
+	 * Best-effort first name of the person we are replying to.
+	 *
+	 * @param object $msg Message row.
+	 * @return string
+	 */
+	public static function recipient_first_name( $msg ) {
+		$name = isset( $msg->from_name ) ? trim( (string) $msg->from_name ) : '';
+		if ( '' !== $name ) {
+			$parts = preg_split( '/\s+/', $name );
+			if ( ! empty( $parts[0] ) ) {
+				return $parts[0];
+			}
+		}
+		$email = isset( $msg->from_email ) ? (string) $msg->from_email : '';
+		$at    = strpos( $email, '@' );
+		if ( false !== $at ) {
+			$local = preg_replace( '/[._\-].*$/', '', substr( $email, 0, $at ) );
+			if ( '' !== $local ) {
+				return ucfirst( $local );
+			}
+		}
+		return 'there';
+	}
+
+	/**
+	 * Build the greeting + sign-off instruction for reply prompts.
+	 *
+	 * @param object $msg Message row being replied to.
+	 * @return string
+	 */
+	public static function signature_instruction( $msg ) {
+		$name    = self::recipient_first_name( $msg );
+		$signoff = AIEH_Settings::get( 'signoff', 'Kind regards' );
+		$sig     = AIEH_Settings::get( 'signature_name' );
+
+		$out = " Open the reply with the greeting line \"Hello {$name},\" on its own line (use the real name, never a placeholder).";
+		if ( '' !== $signoff || '' !== $sig ) {
+			$out .= ' Close the reply with';
+			if ( '' !== $signoff ) {
+				$out .= " \"{$signoff},\"";
+			}
+			if ( '' !== $sig ) {
+				$out .= ( '' !== $signoff ? ' followed by' : '' ) . " \"{$sig}\"";
+			}
+			$out .= ' on separate lines at the end. Do not duplicate an existing greeting or sign-off.';
+		}
+		return $out;
+	}
+
+	/**
 	 * Summarize a message and persist the summary.
 	 *
 	 * @param int $message_id Local id.
@@ -83,6 +133,7 @@ class AIEH_Email_Processor {
 		$system  = "You are the email assistant for the user. Write a helpful, professional reply to the email below. ";
 		$system .= "Only answer using facts you are confident about. If FAQ knowledge is provided, prefer it. ";
 		$system .= "Do not invent policies, prices, or commitments. Keep it concise. Output only the reply body (no subject line, no placeholders like [Name] unless necessary).";
+		$system .= self::signature_instruction( $msg );
 
 		if ( '' !== $examples ) {
 			$system .= "\n\n" . $examples;

@@ -39,6 +39,8 @@ class AIEH_Settings {
 			'smtp_validate_cert' => 1,
 			'from_email'     => '',
 			'from_name'      => '',
+			'signature_name' => '',
+			'signoff'        => 'Kind regards',
 			'openai_api_key' => '',
 			'openai_model'   => 'gpt-4o-mini',
 			'fetch_limit'    => 25,

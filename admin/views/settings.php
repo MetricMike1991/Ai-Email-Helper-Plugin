@@ -91,6 +91,15 @@ $has_secret = static function ( $val ) {
 				<td><input name="openai_model" id="openai_model" type="text" class="regular-text" value="<?php echo esc_attr( $s['openai_model'] ); ?>" placeholder="gpt-4o-mini"></td></tr>
 		</table>
 
+		<h2><?php esc_html_e( 'Reply Signature', 'ai-email-helper' ); ?></h2>
+		<p class="description"><?php esc_html_e( 'AI replies open with “Hello [first name],” and close with your sign-off below.', 'ai-email-helper' ); ?></p>
+		<table class="form-table" role="presentation">
+			<tr><th><label for="signature_name"><?php esc_html_e( 'Your name (sign-off)', 'ai-email-helper' ); ?></label></th>
+				<td><input name="signature_name" id="signature_name" type="text" class="regular-text" value="<?php echo esc_attr( $s['signature_name'] ); ?>" placeholder="Michael Shortall"></td></tr>
+			<tr><th><label for="signoff"><?php esc_html_e( 'Sign-off phrase', 'ai-email-helper' ); ?></label></th>
+				<td><input name="signoff" id="signoff" type="text" class="regular-text" value="<?php echo esc_attr( $s['signoff'] ); ?>" placeholder="Kind regards"></td></tr>
+		</table>
+
 		<h2><?php esc_html_e( 'Automation', 'ai-email-helper' ); ?></h2>
 		<table class="form-table" role="presentation">
 			<tr><th><label for="fetch_limit"><?php esc_html_e( 'Emails to fetch per run', 'ai-email-helper' ); ?></label></th>

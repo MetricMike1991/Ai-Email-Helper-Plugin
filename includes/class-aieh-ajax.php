@@ -264,6 +264,9 @@ class AIEH_Ajax {
 		if ( '' !== $examples ) {
 			$system .= "\n\n" . $examples . "\n\nMatch the tone and style shown in those examples.";
 		}
+		if ( $msg ) {
+			$system .= AIEH_Email_Processor::signature_instruction( $msg );
+		}
 
 		$user = '';
 		if ( $msg ) {
