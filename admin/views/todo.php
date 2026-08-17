@@ -70,7 +70,7 @@ foreach ( $tasks as $t ) {
 				<div class="aieh-cards" data-column="<?php echo esc_attr( $col['id'] ); ?>">
 					<?php if ( ! empty( $by_col[ $col['id'] ] ) ) : ?>
 						<?php foreach ( $by_col[ $col['id'] ] as $t ) : ?>
-							<div class="aieh-task" data-id="<?php echo esc_attr( $t->id ); ?>" data-priority="<?php echo (int) $t->priority; ?>">
+							<div class="aieh-task<?php echo ( ! empty( $t->completed_at ) && empty( $t->recurrence ) ) ? ' is-done' : ''; ?>" data-id="<?php echo esc_attr( $t->id ); ?>" data-priority="<?php echo (int) $t->priority; ?>">
 								<span class="aieh-prio-strip prio-<?php echo (int) $t->priority; ?>"></span>
 								<div class="aieh-task-title"><?php echo esc_html( $t->title ); ?></div>
 
@@ -99,7 +99,11 @@ foreach ( $tasks as $t ) {
 								<?php endif; ?>
 
 								<div class="aieh-task-actions">
-									<button type="button" class="button-link aieh-task-complete"><?php esc_html_e( 'Complete', 'ai-email-helper' ); ?></button>
+									<?php if ( ! empty( $t->completed_at ) && empty( $t->recurrence ) ) : ?>
+										<button type="button" class="button-link aieh-task-reopen"><?php esc_html_e( 'Reopen', 'ai-email-helper' ); ?></button>
+									<?php else : ?>
+										<button type="button" class="button-link aieh-task-complete"><?php esc_html_e( 'Complete', 'ai-email-helper' ); ?></button>
+									<?php endif; ?>
 									<button type="button" class="button-link aieh-task-edit"><?php esc_html_e( 'Edit', 'ai-email-helper' ); ?></button>
 									<button type="button" class="button-link aieh-task-delete"><?php esc_html_e( 'Delete', 'ai-email-helper' ); ?></button>
 								</div>

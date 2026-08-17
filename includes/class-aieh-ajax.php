@@ -40,6 +40,7 @@ class AIEH_Ajax {
 			'aieh_task_create'   => 'task_create',
 			'aieh_task_update'   => 'task_update',
 			'aieh_task_complete' => 'task_complete',
+			'aieh_task_uncomplete' => 'task_uncomplete',
 			'aieh_task_delete'   => 'task_delete',
 			'aieh_task_reorder'  => 'task_reorder',
 			'aieh_column_add'    => 'column_add',
@@ -458,6 +459,19 @@ class AIEH_Ajax {
 	}
 
 	/**
+	 * Reopen a completed task (clear its completion + move back to first column).
+	 */
+	public function task_uncomplete() {
+		$this->guard();
+		$id = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		if ( ! $id ) {
+			wp_send_json_error( array( 'message' => __( 'Card not found.', 'ai-email-helper' ) ) );
+		}
+		AIEH_Tasks::uncomplete( $id );
+		wp_send_json_success( array( 'message' => __( 'Reopened.', 'ai-email-helper' ) ) );
+	}
+
+	/**
 	 * Delete a task.
 	 */
 	public function task_delete() {
@@ -548,7 +562,20 @@ class AIEH_Ajax {
 	 */
 	public function ai_overview() {
 		$this->guard();
-		$overview = AIEH_Tasks::ai_overview();
+		$history_raw = isset( $_POST['history'] ) ? wp_unslash( $_POST['history'] ) : '[]';
+		$history     = json_decode( $history_raw, true );
+		$clean       = array();
+		if ( is_array( $history ) ) {
+			foreach ( array_slice( $history, -10 ) as $h ) {
+				if ( isset( $h['role'], $h['content'] ) ) {
+					$clean[] = array(
+						'role'    => ( 'assistant' === $h['role'] ) ? 'assistant' : 'user',
+						'content' => sanitize_textarea_field( (string) $h['content'] ),
+					);
+				}
+			}
+		}
+		$overview = AIEH_Tasks::ai_overview( $clean );
 		if ( is_wp_error( $overview ) ) {
 			wp_send_json_error( array( 'message' => $overview->get_error_message() ) );
 		}

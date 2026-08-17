@@ -221,6 +221,8 @@
 .aieh-prio-strip.prio-2 { background: #dba617; }
 .aieh-prio-strip.prio-3 { background: #d63638; }
 .aieh-task-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.aieh-task.is-done { opacity: 0.65; }
+.aieh-task.is-done .aieh-task-title { text-decoration: line-through; }
 .aieh-task-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 4px; }
 .aieh-prio-badge { font-size: 10px; border-radius: 10px; padding: 1px 8px; color: #fff; }
 .aieh-prio-badge.prio-1 { background: #72aee6; }

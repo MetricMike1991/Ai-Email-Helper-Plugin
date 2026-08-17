@@ -427,26 +427,22 @@ class AIEH_Tasks {
 			return true;
 		}
 
-		$done_id = self::done_column_id(); // Never auto-move completed cards.
 		$cols    = self::columns();
 		$col_ctx = array();
 		$valid   = array();
 		foreach ( $cols as $c ) {
-			if ( $c['id'] === $done_id ) {
-				continue; // Not an auto-routing target.
-			}
 			$col_ctx[] = array(
-				'column_id'  => $c['id'],
-				'label'      => $c['label'],
-				'about'      => $c['description'],
+				'column_id' => $c['id'],
+				'label'     => $c['label'],
+				'about'     => $c['description'],
 			);
 			$valid[ $c['id'] ] = true;
 		}
 
 		$list = array();
 		foreach ( $tasks as $t ) {
-			if ( $t->column_id === $done_id ) {
-				continue;
+			if ( self::is_complete( $t ) ) {
+				continue; // Truly completed one-off tasks are left where they are.
 			}
 			$list[] = array(
 				'id'         => (int) $t->id,
@@ -529,10 +525,12 @@ class AIEH_Tasks {
 
 	/**
 	 * Generate a short AI briefing of the board: what's urgent and what to do next.
+	 * Recent chat turns are folded in so the briefing reflects the conversation.
 	 *
+	 * @param array $history Recent chat turns [ ['role'=>..,'content'=>..], ... ].
 	 * @return string|WP_Error
 	 */
-	public static function ai_overview() {
+	public static function ai_overview( $history = array() ) {
 		$tasks = self::all();
 		if ( empty( $tasks ) ) {
 			return __( 'Your board is empty — add some cards first.', 'ai-email-helper' );
@@ -543,33 +541,73 @@ class AIEH_Tasks {
 		foreach ( $cols as $c ) {
 			$labels[ $c['id'] ] = $c['label'];
 		}
-		$done_id = self::done_column_id();
 
 		$list = array();
 		foreach ( $tasks as $t ) {
 			$list[] = array(
-				'title'    => $t->title,
-				'column'   => isset( $labels[ $t->column_id ] ) ? $labels[ $t->column_id ] : $t->column_id,
-				'priority' => (int) $t->priority,
-				'due_date' => $t->due_date,
-				'recurrence' => $t->recurrence,
+				'title'          => $t->title,
+				'column'         => isset( $labels[ $t->column_id ] ) ? $labels[ $t->column_id ] : $t->column_id,
+				'priority'       => (int) $t->priority,
+				'due_date'       => $t->due_date,
+				'recurrence'     => $t->recurrence,
 				'last_completed' => $t->completed_at,
-				'done'     => ( $t->column_id === $done_id ),
+				'is_complete'    => self::is_complete( $t ),
 			);
 		}
 
-		$messages = array(
-			array(
-				'role'    => 'system',
-				'content' => 'You are a concise executive assistant. Given the current date/time and a JSON list of Kanban tasks, write a short briefing (a few sentences plus a short bullet list) of what is most important, what is overdue or due soon, and what the user should tackle next. Pay attention to recurring tasks: use "recurrence" and "last_completed" to point out anything weekly/monthly that is due again based on how long it has been. Ignore tasks already in the done column except to acknowledge progress. Plain text only.',
-			),
-			array(
-				'role'    => 'user',
-				'content' => 'Current date/time: ' . current_time( 'mysql' ) . "\n\nTasks:\n" . wp_json_encode( $list ),
-			),
+		$system  = 'You are a concise executive assistant. Given the current date/time and a JSON list of Kanban tasks, write a short briefing (a few sentences plus a short bullet list) of what is most important, what is overdue or due soon, and what the user should tackle next. ';
+		$system .= 'IMPORTANT: a task is complete ONLY when its "is_complete" is true (it has a completion timestamp and is not recurring). The "column" is just how the user organises cards and does NOT mean a task is done — never assume a task is finished because of its column. ';
+		$system .= 'For recurring tasks use "recurrence" and "last_completed" to flag anything weekly/monthly that is due again based on how long it has been. If earlier conversation is provided, take it into account. Plain text only.';
+
+		$messages   = array();
+		$messages[] = array( 'role' => 'system', 'content' => $system );
+		foreach ( (array) $history as $h ) {
+			if ( ! isset( $h['role'], $h['content'] ) ) {
+				continue;
+			}
+			$messages[] = array(
+				'role'    => ( 'assistant' === $h['role'] ) ? 'assistant' : 'user',
+				'content' => (string) $h['content'],
+			);
+		}
+		$messages[] = array(
+			'role'    => 'user',
+			'content' => 'Current date/time: ' . current_time( 'mysql' ) . "\n\nTasks:\n" . wp_json_encode( $list ) . "\n\nGive me the briefing.",
 		);
 
 		return AIEH_OpenAI_Client::chat( $messages, array( 'max_tokens' => 500, 'temperature' => 0.4 ) );
+	}
+
+	/**
+	 * A task counts as complete only when it has a completion timestamp and is
+	 * not recurring — never based on which column it sits in.
+	 *
+	 * @param object $t Task row.
+	 * @return bool
+	 */
+	public static function is_complete( $t ) {
+		return ! empty( $t->completed_at ) && empty( $t->recurrence );
+	}
+
+	/**
+	 * Reopen a completed task: clear its completion timestamp and move it back to
+	 * the first column.
+	 *
+	 * @param int $id Task id.
+	 */
+	public static function uncomplete( $id ) {
+		global $wpdb;
+		$table = AIEH_Activator::tasks_table();
+		if ( ! self::get( $id ) ) {
+			return;
+		}
+		$wpdb->update( // phpcs:ignore WordPress.DB
+			$table,
+			array( 'completed_at' => null, 'column_id' => self::first_column_id(), 'updated_at' => current_time( 'mysql', true ) ),
+			array( 'id' => (int) $id ),
+			array( '%s', '%s', '%s' ),
+			array( '%d' )
+		);
 	}
 
 	/* ---------------------------------------------------------------------
@@ -602,6 +640,7 @@ class AIEH_Tasks {
 				'due_date'       => $t->due_date,
 				'recurrence'     => $t->recurrence,
 				'last_completed' => $t->completed_at,
+				'is_complete'    => self::is_complete( $t ),
 				'notes'          => mb_substr( (string) $t->notes, 0, 300 ),
 			);
 		}
@@ -613,9 +652,11 @@ class AIEH_Tasks {
 		$system .= '{"type":"update_task","id":N,...same fields...}; ';
 		$system .= '{"type":"move_task","id":N,"column":"<id or label>"}; ';
 		$system .= '{"type":"complete_task","id":N}; ';
+		$system .= '{"type":"uncomplete_task","id":N}; ';
 		$system .= '{"type":"delete_task","id":N}; ';
 		$system .= '{"type":"add_column","label":"..","description":".."}; ';
 		$system .= '{"type":"prioritise_board"}. ';
+		$system .= "A task is complete ONLY when its is_complete is true; a card's column never means it is done. ";
 		$system .= "Use task ids exactly as given in the board context. If the user is only asking a question or chatting, return an empty actions array and answer in 'reply'. Confirm any changes you make in 'reply'. Keep replies concise. Current date/time: " . current_time( 'mysql' ) . '.';
 
 		$messages   = array();
@@ -720,6 +761,13 @@ class AIEH_Tasks {
 				case 'complete_task':
 					if ( ! empty( $a['id'] ) ) {
 						self::complete( (int) $a['id'] );
+						$changed = true;
+					}
+					break;
+
+				case 'uncomplete_task':
+					if ( ! empty( $a['id'] ) ) {
+						self::uncomplete( (int) $a['id'] );
 						$changed = true;
 					}
 					break;

@@ -466,6 +466,16 @@
 			} );
 		} );
 
+		/* Reopen a completed card. */
+		$( '.aieh-board' ).on( 'click', '.aieh-task-reopen', function () {
+			var $t = $( this ).closest( '.aieh-task' );
+			post( 'aieh_task_uncomplete', { id: $t.data( 'id' ) } ).done( function ( r ) {
+				if ( r.success ) {
+					window.location.reload();
+				}
+			} );
+		} );
+
 		/* Delete a card. */
 		$( '.aieh-board' ).on( 'click', '.aieh-task-delete', function () {
 			if ( ! window.confirm( 'Delete this card?' ) ) {
@@ -539,7 +549,7 @@
 			var $btn = $( this );
 			$todoStatus.text( AIEH.i18n.working ).removeClass( 'is-error is-ok' );
 			busy( $btn, true );
-			post( 'aieh_ai_overview' ).done( function ( r ) {
+			post( 'aieh_ai_overview', { history: JSON.stringify( chatHistory || [] ) } ).done( function ( r ) {
 				if ( r.success ) {
 					$todoStatus.text( '' );
 					$( '#aieh-overview-panel' ).text( r.data.overview ).prop( 'hidden', false );
