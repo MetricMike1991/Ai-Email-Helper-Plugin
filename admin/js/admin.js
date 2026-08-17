@@ -475,6 +475,11 @@
 			post( 'aieh_column_rename', { id: $( this ).data( 'column' ), label: $( this ).text().trim() } );
 		} );
 
+		/* Save column AI description on blur. */
+		$( '.aieh-board' ).on( 'blur', '.aieh-col-desc', function () {
+			post( 'aieh_column_describe', { id: $( this ).data( 'column' ), description: $( this ).text().trim() } );
+		} );
+
 		/* Delete column. */
 		$( '.aieh-board' ).on( 'click', '.aieh-col-delete', function () {
 			if ( ! window.confirm( 'Delete this column? Its cards move to the first column.' ) ) {
@@ -494,7 +499,7 @@
 			if ( ! label ) {
 				return;
 			}
-			post( 'aieh_column_add', { label: label } ).done( function ( r ) {
+			post( 'aieh_column_add', { label: label, description: $( '#aieh-new-column-desc' ).val().trim() } ).done( function ( r ) {
 				if ( r.success ) {
 					window.location.reload();
 				}

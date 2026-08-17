@@ -22,14 +22,15 @@ class AIEH_Tasks {
 	 */
 	public static function default_columns() {
 		return array(
-			array( 'id' => 'todo', 'label' => 'To Do' ),
-			array( 'id' => 'doing', 'label' => 'In Progress' ),
-			array( 'id' => 'done', 'label' => 'Done' ),
+			array( 'id' => 'todo', 'label' => 'To Do', 'description' => 'Tasks not started yet that need action.' ),
+			array( 'id' => 'doing', 'label' => 'In Progress', 'description' => 'Tasks currently being worked on.' ),
+			array( 'id' => 'done', 'label' => 'Done', 'description' => 'Completed tasks.' ),
 		);
 	}
 
 	/**
-	 * Get the configured columns (falls back to defaults).
+	 * Get the configured columns (falls back to defaults). Each column is
+	 * normalised to always include a 'description' key.
 	 *
 	 * @return array
 	 */
@@ -39,6 +40,12 @@ class AIEH_Tasks {
 			$cols = self::default_columns();
 			update_option( self::COLUMNS_OPTION, $cols );
 		}
+		foreach ( $cols as &$col ) {
+			if ( ! isset( $col['description'] ) ) {
+				$col['description'] = '';
+			}
+		}
+		unset( $col );
 		return $cols;
 	}
 
@@ -77,14 +84,33 @@ class AIEH_Tasks {
 	 * @param string $label Column label.
 	 * @return array
 	 */
-	public static function add_column( $label ) {
+	public static function add_column( $label, $description = '' ) {
 		$label = sanitize_text_field( $label );
 		$cols  = self::columns();
 		$id    = 'col_' . substr( md5( $label . microtime() ), 0, 8 );
-		$col   = array( 'id' => $id, 'label' => '' !== $label ? $label : __( 'New column', 'ai-email-helper' ) );
+		$col   = array(
+			'id'          => $id,
+			'label'       => '' !== $label ? $label : __( 'New column', 'ai-email-helper' ),
+			'description' => sanitize_textarea_field( $description ),
+		);
 		$cols[] = $col;
 		update_option( self::COLUMNS_OPTION, $cols );
 		return $col;
+	}
+
+	/**
+	 * Update a column's AI description.
+	 */
+	public static function describe_column( $id, $description ) {
+		$description = sanitize_textarea_field( $description );
+		$cols        = self::columns();
+		foreach ( $cols as &$col ) {
+			if ( $col['id'] === $id ) {
+				$col['description'] = $description;
+			}
+		}
+		unset( $col );
+		update_option( self::COLUMNS_OPTION, $cols );
 	}
 
 	/**
@@ -301,8 +327,8 @@ class AIEH_Tasks {
 	 * ------------------------------------------------------------------- */
 
 	/**
-	 * Ask the AI to assign a priority (1-3) to every open (non-done) task based
-	 * on notes, category, linked email, due dates and the current date/time,
+	 * Ask the AI to assign a priority (1-3) to every open (non-done) task and
+	 * route it into the best-matching column (by the columns' AI descriptions),
 	 * then sort each column so the most urgent are at the top.
 	 *
 	 * @return true|WP_Error
@@ -313,19 +339,35 @@ class AIEH_Tasks {
 			return true;
 		}
 
-		$done_id   = self::done_column_id(); // Treat the last column as "done".
-		$list      = array();
+		$done_id = self::done_column_id(); // Never auto-move completed cards.
+		$cols    = self::columns();
+		$col_ctx = array();
+		$valid   = array();
+		foreach ( $cols as $c ) {
+			if ( $c['id'] === $done_id ) {
+				continue; // Not an auto-routing target.
+			}
+			$col_ctx[] = array(
+				'column_id'  => $c['id'],
+				'label'      => $c['label'],
+				'about'      => $c['description'],
+			);
+			$valid[ $c['id'] ] = true;
+		}
+
+		$list = array();
 		foreach ( $tasks as $t ) {
 			if ( $t->column_id === $done_id ) {
 				continue;
 			}
 			$list[] = array(
-				'id'       => (int) $t->id,
-				'title'    => $t->title,
-				'notes'    => mb_substr( (string) $t->notes, 0, 500 ),
-				'category' => $t->category,
-				'due_date' => $t->due_date,
-				'created'  => $t->created_at,
+				'id'         => (int) $t->id,
+				'title'      => $t->title,
+				'notes'      => mb_substr( (string) $t->notes, 0, 500 ),
+				'category'   => $t->category,
+				'due_date'   => $t->due_date,
+				'created'    => $t->created_at,
+				'column_now' => $t->column_id,
 			);
 		}
 		if ( empty( $list ) ) {
@@ -336,15 +378,15 @@ class AIEH_Tasks {
 		$messages = array(
 			array(
 				'role'    => 'system',
-				'content' => 'You are a task prioritisation assistant. Given a JSON array of tasks and the current date/time, assign each task a priority: 3 = high/urgent, 2 = medium, 1 = low. Consider due dates (overdue or soon = higher), importance implied by the notes/title, and age. Respond with ONLY a compact JSON array of objects like [{"id":12,"priority":3}], no markdown, no commentary.',
+				'content' => 'You organise a Kanban board. You are given the available columns (each with an "about" description of what belongs there), the current date/time, and a list of tasks. For EACH task: (1) choose the best column_id from the provided columns by matching the task to the column descriptions; (2) assign a priority 3=high/urgent, 2=medium, 1=low, considering due dates (overdue or soon = higher), importance and age. Only use column_id values from the provided columns. Respond with ONLY a compact JSON array like [{"id":12,"column_id":"todo","priority":3}] — no markdown, no commentary.',
 			),
 			array(
 				'role'    => 'user',
-				'content' => 'Current date/time: ' . $now . "\n\nTasks:\n" . wp_json_encode( $list ),
+				'content' => 'Current date/time: ' . $now . "\n\nColumns:\n" . wp_json_encode( $col_ctx ) . "\n\nTasks:\n" . wp_json_encode( $list ),
 			),
 		);
 
-		$resp = AIEH_OpenAI_Client::chat( $messages, array( 'max_tokens' => 800, 'temperature' => 0.1 ) );
+		$resp = AIEH_OpenAI_Client::chat( $messages, array( 'max_tokens' => 900, 'temperature' => 0.1 ) );
 		if ( is_wp_error( $resp ) ) {
 			return $resp;
 		}
@@ -360,11 +402,18 @@ class AIEH_Tasks {
 			if ( ! isset( $row['id'], $row['priority'] ) ) {
 				continue;
 			}
+			$fields  = array( 'priority' => max( 1, min( 3, (int) $row['priority'] ) ), 'updated_at' => current_time( 'mysql', true ) );
+			$formats = array( '%d', '%s' );
+			// Move to the AI-chosen column when it is a valid non-done column.
+			if ( isset( $row['column_id'] ) && isset( $valid[ $row['column_id'] ] ) ) {
+				$fields['column_id'] = $row['column_id'];
+				$formats[]           = '%s';
+			}
 			$wpdb->update( // phpcs:ignore WordPress.DB
 				$table,
-				array( 'priority' => max( 1, min( 3, (int) $row['priority'] ) ), 'updated_at' => current_time( 'mysql', true ) ),
+				$fields,
 				array( 'id' => (int) $row['id'] ),
-				array( '%d', '%s' ),
+				$formats,
 				array( '%d' )
 			);
 		}

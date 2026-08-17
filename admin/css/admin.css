@@ -188,6 +188,20 @@
 }
 .aieh-col-delete:hover { color: #b32d2e; }
 
+.aieh-col-desc {
+	font-size: 11px;
+	color: #50575e;
+	padding: 3px 6px;
+	margin: 0 0 8px;
+	border-radius: 3px;
+	outline: none;
+	min-height: 16px;
+	cursor: text;
+}
+.aieh-col-desc:focus { background: #fff; box-shadow: 0 0 0 1px #2271b1; }
+.aieh-col-desc:empty::before { content: attr( data-placeholder ); color: #a7aaad; }
+.aieh-add-column input[type="text"] { min-width: 200px; }
+
 .aieh-cards { min-height: 24px; }
 .aieh-task {
 	position: relative;

@@ -36,6 +36,7 @@ foreach ( $tasks as $t ) {
 
 	<div class="aieh-add-column">
 		<input type="text" id="aieh-new-column" placeholder="<?php esc_attr_e( 'New column name…', 'ai-email-helper' ); ?>">
+		<input type="text" id="aieh-new-column-desc" placeholder="<?php esc_attr_e( 'What belongs here (AI hint)…', 'ai-email-helper' ); ?>">
 		<button type="button" class="button" id="aieh-add-column"><?php esc_html_e( 'Add Column', 'ai-email-helper' ); ?></button>
 	</div>
 
@@ -46,6 +47,7 @@ foreach ( $tasks as $t ) {
 					<span class="aieh-col-title" data-column="<?php echo esc_attr( $col['id'] ); ?>" contenteditable="true"><?php echo esc_html( $col['label'] ); ?></span>
 					<button type="button" class="aieh-col-delete" title="<?php esc_attr_e( 'Delete column', 'ai-email-helper' ); ?>">&times;</button>
 				</div>
+				<div class="aieh-col-desc" data-column="<?php echo esc_attr( $col['id'] ); ?>" contenteditable="true" data-placeholder="<?php esc_attr_e( 'Describe what belongs here (AI hint)…', 'ai-email-helper' ); ?>"><?php echo esc_html( $col['description'] ); ?></div>
 
 				<div class="aieh-cards" data-column="<?php echo esc_attr( $col['id'] ); ?>">
 					<?php if ( ! empty( $by_col[ $col['id'] ] ) ) : ?>

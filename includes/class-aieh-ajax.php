@@ -43,6 +43,7 @@ class AIEH_Ajax {
 			'aieh_task_reorder'  => 'task_reorder',
 			'aieh_column_add'    => 'column_add',
 			'aieh_column_rename' => 'column_rename',
+			'aieh_column_describe' => 'column_describe',
 			'aieh_column_delete' => 'column_delete',
 			'aieh_column_reorder' => 'column_reorder',
 			'aieh_ai_prioritise' => 'ai_prioritise',
@@ -464,8 +465,9 @@ class AIEH_Ajax {
 	 */
 	public function column_add() {
 		$this->guard();
-		$label = isset( $_POST['label'] ) ? sanitize_text_field( wp_unslash( $_POST['label'] ) ) : '';
-		$col   = AIEH_Tasks::add_column( $label );
+		$label       = isset( $_POST['label'] ) ? sanitize_text_field( wp_unslash( $_POST['label'] ) ) : '';
+		$description = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
+		$col         = AIEH_Tasks::add_column( $label, $description );
 		wp_send_json_success( array( 'column' => $col ) );
 	}
 
@@ -477,6 +479,17 @@ class AIEH_Ajax {
 		$id    = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
 		$label = isset( $_POST['label'] ) ? sanitize_text_field( wp_unslash( $_POST['label'] ) ) : '';
 		AIEH_Tasks::rename_column( $id, $label );
+		wp_send_json_success();
+	}
+
+	/**
+	 * Update a column's AI description.
+	 */
+	public function column_describe() {
+		$this->guard();
+		$id          = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+		$description = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
+		AIEH_Tasks::describe_column( $id, $description );
 		wp_send_json_success();
 	}
 
