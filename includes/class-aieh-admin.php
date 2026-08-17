@@ -64,8 +64,14 @@ class AIEH_Admin {
 		if ( false === strpos( $hook, self::SLUG ) ) {
 			return;
 		}
-		wp_enqueue_style( 'aieh-admin', AIEH_PLUGIN_URL . 'admin/css/admin.css', array(), AIEH_VERSION );
-		wp_enqueue_script( 'aieh-admin', AIEH_PLUGIN_URL . 'admin/js/admin.js', array( 'jquery' ), AIEH_VERSION, true );
+		$css = AIEH_PLUGIN_DIR . 'admin/css/admin.css';
+		$js  = AIEH_PLUGIN_DIR . 'admin/js/admin.js';
+		// Version by file mtime so browsers always load the current asset.
+		$css_ver = file_exists( $css ) ? (string) filemtime( $css ) : AIEH_VERSION;
+		$js_ver  = file_exists( $js ) ? (string) filemtime( $js ) : AIEH_VERSION;
+
+		wp_enqueue_style( 'aieh-admin', AIEH_PLUGIN_URL . 'admin/css/admin.css', array(), $css_ver );
+		wp_enqueue_script( 'aieh-admin', AIEH_PLUGIN_URL . 'admin/js/admin.js', array( 'jquery' ), $js_ver, true );
 		wp_localize_script(
 			'aieh-admin',
 			'AIEH',
