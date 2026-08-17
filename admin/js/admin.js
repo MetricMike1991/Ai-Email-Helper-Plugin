@@ -187,6 +187,23 @@
 		$card.find( '.aieh-draft-text' ).focus();
 	} );
 
+	/* ---- Add this email to the To-Do board ---- */
+	$( '.aieh-list' ).on( 'click', '.aieh-add-todo', function () {
+		var $card = $( this ).closest( '.aieh-card' );
+		var $btn = $( this );
+		var $status = $card.find( '.aieh-card-status' ).text( AIEH.i18n.working ).removeClass( 'is-error is-ok' );
+		busy( $btn, true );
+		post( 'aieh_add_to_todo', { id: $card.data( 'id' ) } ).done( function ( r ) {
+			if ( r.success ) {
+				$status.text( r.data.message ).addClass( 'is-ok' );
+			} else {
+				$status.text( r.data.message ).addClass( 'is-error' );
+			}
+		} ).always( function () {
+			busy( $btn, false );
+		} );
+	} );
+
 	/* ---- Polish the typed reply: improve wording + match tone ---- */
 	$( '.aieh-list' ).on( 'click', '.aieh-polish', function () {
 		var $card = $( this ).closest( '.aieh-card' );
@@ -353,5 +370,170 @@
 			busy( $btn, false );
 		} );
 	} );
+
+	/* =====================================================================
+	 * To-Do / Kanban board
+	 * ================================================================== */
+	if ( $( '#aieh-board' ).length ) {
+
+		var $todoStatus = $( '#aieh-todo-status' );
+
+		/* Drag & drop cards between/within columns. */
+		if ( $.fn.sortable ) {
+			$( '.aieh-cards' ).sortable( {
+				connectWith: '.aieh-cards',
+				items: '> .aieh-task',
+				placeholder: 'aieh-task-placeholder',
+				forcePlaceholderSize: true,
+				tolerance: 'pointer',
+				cancel: 'input, textarea, select, button, [contenteditable]',
+				stop: function () {
+					$( '.aieh-cards' ).each( function () {
+						var col = $( this ).data( 'column' );
+						var ids = $( this ).children( '.aieh-task' ).map( function () {
+							return $( this ).data( 'id' );
+						} ).get();
+						post( 'aieh_task_reorder', { column_id: col, ids: ids } );
+					} );
+				}
+			} );
+
+			/* Drag to reorder columns (grab the header, not the title/delete). */
+			$( '#aieh-board' ).sortable( {
+				items: '> .aieh-column',
+				handle: '.aieh-column-head',
+				cancel: '.aieh-col-title, .aieh-col-delete',
+				tolerance: 'pointer',
+				stop: function () {
+					var ids = $( '#aieh-board' ).children( '.aieh-column' ).map( function () {
+						return $( this ).data( 'column' );
+					} ).get();
+					post( 'aieh_column_reorder', { ids: ids } );
+				}
+			} );
+		}
+
+		/* Quick add card (Enter). */
+		$( '.aieh-board' ).on( 'keydown', '.aieh-new-card-title', function ( e ) {
+			if ( 13 !== e.which ) {
+				return;
+			}
+			e.preventDefault();
+			var title = $( this ).val().trim();
+			var col = $( this ).closest( '.aieh-column' ).data( 'column' );
+			if ( ! title ) {
+				return;
+			}
+			post( 'aieh_task_create', { title: title, column_id: col } ).done( function ( r ) {
+				if ( r.success ) {
+					window.location.reload();
+				}
+			} );
+		} );
+
+		/* Edit / cancel / save a card. */
+		$( '.aieh-board' ).on( 'click', '.aieh-task-edit', function () {
+			$( this ).closest( '.aieh-task' ).find( '.aieh-task-form' ).prop( 'hidden', false );
+		} );
+		$( '.aieh-board' ).on( 'click', '.aieh-task-cancel', function () {
+			$( this ).closest( '.aieh-task-form' ).prop( 'hidden', true );
+		} );
+		$( '.aieh-board' ).on( 'click', '.aieh-task-save', function () {
+			var $t = $( this ).closest( '.aieh-task' );
+			var $f = $t.find( '.aieh-task-form' );
+			post( 'aieh_task_update', {
+				id: $t.data( 'id' ),
+				title: $f.find( '.aieh-tf-title' ).val(),
+				notes: $f.find( '.aieh-tf-notes' ).val(),
+				priority: $f.find( '.aieh-tf-priority' ).val(),
+				category: $f.find( '.aieh-tf-category' ).val(),
+				due_date: $f.find( '.aieh-tf-due' ).val()
+			} ).done( function ( r ) {
+				if ( r.success ) {
+					window.location.reload();
+				}
+			} );
+		} );
+
+		/* Delete a card. */
+		$( '.aieh-board' ).on( 'click', '.aieh-task-delete', function () {
+			if ( ! window.confirm( 'Delete this card?' ) ) {
+				return;
+			}
+			var $t = $( this ).closest( '.aieh-task' );
+			post( 'aieh_task_delete', { id: $t.data( 'id' ) } ).done( function ( r ) {
+				if ( r.success ) {
+					$t.fadeOut( 150, function () {
+						$t.remove();
+					} );
+				}
+			} );
+		} );
+
+		/* Rename column on blur. */
+		$( '.aieh-board' ).on( 'blur', '.aieh-col-title', function () {
+			post( 'aieh_column_rename', { id: $( this ).data( 'column' ), label: $( this ).text().trim() } );
+		} );
+
+		/* Delete column. */
+		$( '.aieh-board' ).on( 'click', '.aieh-col-delete', function () {
+			if ( ! window.confirm( 'Delete this column? Its cards move to the first column.' ) ) {
+				return;
+			}
+			var id = $( this ).closest( '.aieh-column' ).data( 'column' );
+			post( 'aieh_column_delete', { id: id } ).done( function ( r ) {
+				if ( r.success ) {
+					window.location.reload();
+				}
+			} );
+		} );
+
+		/* Add column. */
+		$( '#aieh-add-column' ).on( 'click', function () {
+			var label = $( '#aieh-new-column' ).val().trim();
+			if ( ! label ) {
+				return;
+			}
+			post( 'aieh_column_add', { label: label } ).done( function ( r ) {
+				if ( r.success ) {
+					window.location.reload();
+				}
+			} );
+		} );
+
+		/* AI prioritise & sort. */
+		$( '#aieh-ai-prioritise' ).on( 'click', function () {
+			var $btn = $( this );
+			$todoStatus.text( AIEH.i18n.working ).removeClass( 'is-error is-ok' );
+			busy( $btn, true );
+			post( 'aieh_ai_prioritise' ).done( function ( r ) {
+				if ( r.success ) {
+					$todoStatus.text( r.data.message ).addClass( 'is-ok' );
+					window.location.reload();
+				} else {
+					$todoStatus.text( r.data.message ).addClass( 'is-error' );
+				}
+			} ).always( function () {
+				busy( $btn, false );
+			} );
+		} );
+
+		/* AI overview briefing. */
+		$( '#aieh-ai-overview' ).on( 'click', function () {
+			var $btn = $( this );
+			$todoStatus.text( AIEH.i18n.working ).removeClass( 'is-error is-ok' );
+			busy( $btn, true );
+			post( 'aieh_ai_overview' ).done( function ( r ) {
+				if ( r.success ) {
+					$todoStatus.text( '' );
+					$( '#aieh-overview-panel' ).text( r.data.overview ).prop( 'hidden', false );
+				} else {
+					$todoStatus.text( r.data.message ).addClass( 'is-error' );
+				}
+			} ).always( function () {
+				busy( $btn, false );
+			} );
+		} );
+	}
 
 } )( jQuery );

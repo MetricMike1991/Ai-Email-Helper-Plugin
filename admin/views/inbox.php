@@ -159,6 +159,7 @@ $tabs     = array(
 							<button type="button" class="button aieh-summarize"><?php esc_html_e( 'Summarize', 'ai-email-helper' ); ?></button>
 							<button type="button" class="button aieh-draft"><?php esc_html_e( 'Suggest Reply', 'ai-email-helper' ); ?></button>
 							<button type="button" class="button aieh-write"><?php esc_html_e( 'Write Reply', 'ai-email-helper' ); ?></button>
+							<button type="button" class="button aieh-add-todo"><?php esc_html_e( 'Add to To-Do', 'ai-email-helper' ); ?></button>
 						</div>
 
 						<div class="aieh-draft-area" style="display:none">

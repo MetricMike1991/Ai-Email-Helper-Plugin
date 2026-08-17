@@ -137,3 +137,95 @@
 .aieh-revise-row input[type="text"] { flex: 1; }
 
 .aieh-faq-edit-row td { background: #f6f7f7; }
+
+/* ---- Kanban board ---- */
+.aieh-kanban-wrap .aieh-add-column { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
+.aieh-overview-panel {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-left: 4px solid #2271b1;
+	border-radius: 4px;
+	padding: 12px 14px;
+	margin: 12px 0;
+	white-space: pre-wrap;
+	font-size: 13px;
+	line-height: 1.5;
+}
+.aieh-board {
+	display: flex;
+	gap: 14px;
+	align-items: flex-start;
+	overflow-x: auto;
+	padding-bottom: 16px;
+}
+.aieh-column {
+	background: #f0f0f1;
+	border-radius: 6px;
+	width: 300px;
+	min-width: 300px;
+	padding: 8px;
+	box-sizing: border-box;
+}
+.aieh-column-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 6px 8px;
+	cursor: grab;
+}
+.aieh-col-title {
+	font-weight: 600;
+	font-size: 14px;
+	outline: none;
+	border-radius: 3px;
+	padding: 2px 4px;
+	flex: 1;
+}
+.aieh-col-title:focus { background: #fff; box-shadow: 0 0 0 1px #2271b1; cursor: text; }
+.aieh-col-delete {
+	border: 0; background: transparent; cursor: pointer;
+	font-size: 18px; line-height: 1; color: #787c82; padding: 0 4px;
+}
+.aieh-col-delete:hover { color: #b32d2e; }
+
+.aieh-cards { min-height: 24px; }
+.aieh-task {
+	position: relative;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 5px;
+	padding: 8px 10px 8px 14px;
+	margin-bottom: 8px;
+	box-shadow: 0 1px 1px rgba( 0, 0, 0, 0.05 );
+	cursor: grab;
+}
+.aieh-prio-strip {
+	position: absolute; left: 0; top: 0; bottom: 0;
+	width: 4px; border-radius: 5px 0 0 5px; background: transparent;
+}
+.aieh-prio-strip.prio-1 { background: #72aee6; }
+.aieh-prio-strip.prio-2 { background: #dba617; }
+.aieh-prio-strip.prio-3 { background: #d63638; }
+.aieh-task-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.aieh-task-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 4px; }
+.aieh-prio-badge { font-size: 10px; border-radius: 10px; padding: 1px 8px; color: #fff; }
+.aieh-prio-badge.prio-1 { background: #72aee6; }
+.aieh-prio-badge.prio-2 { background: #dba617; }
+.aieh-prio-badge.prio-3 { background: #d63638; }
+.aieh-due { font-size: 11px; color: #50575e; }
+.aieh-task-badge { font-size: 10px; background: #eef3f8; color: #1d4a7a; border-radius: 10px; padding: 1px 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aieh-task-notes { font-size: 12px; color: #3c434a; white-space: pre-wrap; margin-bottom: 6px; }
+.aieh-task-actions { display: flex; gap: 10px; font-size: 12px; }
+.aieh-task-form { margin-top: 8px; }
+.aieh-task-form input[type="text"], .aieh-task-form textarea { width: 100%; margin-bottom: 6px; }
+.aieh-tf-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 6px; font-size: 11px; }
+.aieh-tf-row label { display: flex; flex-direction: column; gap: 2px; }
+.aieh-task-placeholder {
+	border: 2px dashed #b4b9be;
+	border-radius: 5px;
+	background: #e6e7e8;
+	margin-bottom: 8px;
+	height: 46px;
+}
+.aieh-add-card { margin-top: 6px; }
+.aieh-new-card-title { width: 100%; }

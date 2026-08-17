@@ -28,6 +28,7 @@ class AIEH_Admin {
 		);
 		add_submenu_page( self::SLUG, __( 'Inbox', 'ai-email-helper' ), __( 'Inbox', 'ai-email-helper' ), 'manage_options', self::SLUG, array( $this, 'render_inbox' ) );
 		add_submenu_page( self::SLUG, __( 'FAQ Sources', 'ai-email-helper' ), __( 'FAQ Sources', 'ai-email-helper' ), 'manage_options', self::SLUG . '-faq', array( $this, 'render_faq' ) );
+		add_submenu_page( self::SLUG, __( 'To-Do Board', 'ai-email-helper' ), __( 'To-Do Board', 'ai-email-helper' ), 'manage_options', self::SLUG . '-todo', array( $this, 'render_todo' ) );
 		add_submenu_page( self::SLUG, __( 'Learning', 'ai-email-helper' ), __( 'Learning', 'ai-email-helper' ), 'manage_options', self::SLUG . '-learning', array( $this, 'render_learning' ) );
 		add_submenu_page( self::SLUG, __( 'Settings', 'ai-email-helper' ), __( 'Settings', 'ai-email-helper' ), 'manage_options', self::SLUG . '-settings', array( $this, 'render_settings' ) );
 	}
@@ -71,7 +72,7 @@ class AIEH_Admin {
 		$js_ver  = file_exists( $js ) ? (string) filemtime( $js ) : AIEH_VERSION;
 
 		wp_enqueue_style( 'aieh-admin', AIEH_PLUGIN_URL . 'admin/css/admin.css', array(), $css_ver );
-		wp_enqueue_script( 'aieh-admin', AIEH_PLUGIN_URL . 'admin/js/admin.js', array( 'jquery' ), $js_ver, true );
+		wp_enqueue_script( 'aieh-admin', AIEH_PLUGIN_URL . 'admin/js/admin.js', array( 'jquery', 'jquery-ui-sortable' ), $js_ver, true );
 		wp_localize_script(
 			'aieh-admin',
 			'AIEH',
@@ -98,6 +99,13 @@ class AIEH_Admin {
 	 */
 	public function render_faq() {
 		require AIEH_PLUGIN_DIR . 'admin/views/faq.php';
+	}
+
+	/**
+	 * To-Do (Kanban) page.
+	 */
+	public function render_todo() {
+		require AIEH_PLUGIN_DIR . 'admin/views/todo.php';
 	}
 
 	/**

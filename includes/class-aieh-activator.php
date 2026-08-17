@@ -30,11 +30,32 @@ class AIEH_Activator {
 		global $wpdb;
 		return $wpdb->prefix . 'aieh_learning';
 	}
+	public static function tasks_table() {
+		global $wpdb;
+		return $wpdb->prefix . 'aieh_tasks';
+	}
 
 	/**
 	 * Create tables on activation.
 	 */
 	public static function activate() {
+		self::install_tables();
+	}
+
+	/**
+	 * Run table creation / upgrades if the stored DB version is out of date.
+	 * Hooked on admin_init so existing installs pick up new tables (e.g. tasks).
+	 */
+	public static function maybe_upgrade() {
+		if ( get_option( 'aieh_db_version' ) !== AIEH_VERSION ) {
+			self::install_tables();
+		}
+	}
+
+	/**
+	 * Create/upgrade all plugin tables (idempotent via dbDelta).
+	 */
+	public static function install_tables() {
 		global $wpdb;
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		$charset_collate = $wpdb->get_charset_collate();
@@ -43,6 +64,7 @@ class AIEH_Activator {
 		$drafts   = self::drafts_table();
 		$faqs     = self::faqs_table();
 		$learning = self::learning_table();
+		$tasks    = self::tasks_table();
 
 		$sql = array();
 
@@ -105,6 +127,27 @@ class AIEH_Activator {
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
 			KEY message_id (message_id)
+		) {$charset_collate};";
+
+		// Kanban to-do cards (manual or linked to an email).
+		$sql[] = "CREATE TABLE {$tasks} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			title TEXT NULL,
+			notes LONGTEXT NULL,
+			column_id VARCHAR(60) NOT NULL DEFAULT 'todo',
+			position INT NOT NULL DEFAULT 0,
+			priority TINYINT NOT NULL DEFAULT 0,
+			category VARCHAR(60) NOT NULL DEFAULT '',
+			source VARCHAR(20) NOT NULL DEFAULT 'manual',
+			message_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			email_from VARCHAR(191) NOT NULL DEFAULT '',
+			email_subject TEXT NULL,
+			due_date DATETIME NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NULL,
+			PRIMARY KEY  (id),
+			KEY column_id (column_id),
+			KEY priority (priority)
 		) {$charset_collate};";
 
 		foreach ( $sql as $statement ) {

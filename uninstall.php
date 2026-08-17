@@ -16,6 +16,7 @@ $tables = array(
 	$wpdb->prefix . 'aieh_drafts',
 	$wpdb->prefix . 'aieh_faqs',
 	$wpdb->prefix . 'aieh_learning',
+	$wpdb->prefix . 'aieh_tasks',
 );
 foreach ( $tables as $table ) {
 	$wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore WordPress.DB
@@ -23,4 +24,5 @@ foreach ( $tables as $table ) {
 
 delete_option( 'aieh_settings' );
 delete_option( 'aieh_db_version' );
+delete_option( 'aieh_kanban_columns' );
 wp_clear_scheduled_hook( 'aieh_fetch_emails_event' );

@@ -36,6 +36,17 @@ class AIEH_Ajax {
 			'aieh_folders'       => 'folders',
 			'aieh_sync_unread'   => 'sync_unread',
 			'aieh_set_category'  => 'set_category',
+			'aieh_add_to_todo'   => 'add_to_todo',
+			'aieh_task_create'   => 'task_create',
+			'aieh_task_update'   => 'task_update',
+			'aieh_task_delete'   => 'task_delete',
+			'aieh_task_reorder'  => 'task_reorder',
+			'aieh_column_add'    => 'column_add',
+			'aieh_column_rename' => 'column_rename',
+			'aieh_column_delete' => 'column_delete',
+			'aieh_column_reorder' => 'column_reorder',
+			'aieh_ai_prioritise' => 'ai_prioritise',
+			'aieh_ai_overview'   => 'ai_overview',
 		);
 		foreach ( $actions as $action => $method ) {
 			add_action( "wp_ajax_{$action}", array( $this, $method ) );
@@ -366,5 +377,150 @@ class AIEH_Ajax {
 		$table = AIEH_Activator::messages_table();
 		$wpdb->update( $table, array( 'category' => substr( $category, 0, 60 ) ), array( 'id' => $id ), array( '%s' ), array( '%d' ) ); // phpcs:ignore WordPress.DB
 		wp_send_json_success( array( 'category' => $category, 'message' => __( 'Category updated.', 'ai-email-helper' ) ) );
+	}
+
+	/* ---------------------------------------------------------------------
+	 * To-Do / Kanban
+	 * ------------------------------------------------------------------- */
+
+	/**
+	 * Create a task linked to a cached email.
+	 */
+	public function add_to_todo() {
+		$this->guard();
+		$id     = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		$result = AIEH_Tasks::from_email( $id );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'task_id' => (int) $result, 'message' => __( 'Added to your To-Do board.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Create a manual task.
+	 */
+	public function task_create() {
+		$this->guard();
+		$data = array(
+			'title'     => isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '',
+			'notes'     => isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '',
+			'column_id' => isset( $_POST['column_id'] ) ? sanitize_text_field( wp_unslash( $_POST['column_id'] ) ) : '',
+			'priority'  => isset( $_POST['priority'] ) ? (int) $_POST['priority'] : 0,
+			'category'  => isset( $_POST['category'] ) ? sanitize_text_field( wp_unslash( $_POST['category'] ) ) : '',
+			'due_date'  => isset( $_POST['due_date'] ) ? sanitize_text_field( wp_unslash( $_POST['due_date'] ) ) : '',
+		);
+		if ( '' === trim( $data['title'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'A card needs a title.', 'ai-email-helper' ) ) );
+		}
+		$new_id = AIEH_Tasks::create( $data );
+		wp_send_json_success( array( 'task_id' => $new_id, 'message' => __( 'Card added.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Update a task's editable fields.
+	 */
+	public function task_update() {
+		$this->guard();
+		$id = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		if ( ! $id ) {
+			wp_send_json_error( array( 'message' => __( 'Card not found.', 'ai-email-helper' ) ) );
+		}
+		$data = array();
+		foreach ( array( 'title', 'notes', 'category', 'due_date' ) as $field ) {
+			if ( isset( $_POST[ $field ] ) ) {
+				$data[ $field ] = sanitize_textarea_field( wp_unslash( $_POST[ $field ] ) );
+			}
+		}
+		if ( isset( $_POST['priority'] ) ) {
+			$data['priority'] = (int) $_POST['priority'];
+		}
+		AIEH_Tasks::update( $id, $data );
+		wp_send_json_success( array( 'message' => __( 'Card saved.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Delete a task.
+	 */
+	public function task_delete() {
+		$this->guard();
+		$id = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		AIEH_Tasks::delete( $id );
+		wp_send_json_success( array( 'message' => __( 'Card deleted.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Persist a column's new card order after a drag/drop.
+	 */
+	public function task_reorder() {
+		$this->guard();
+		$column_id = isset( $_POST['column_id'] ) ? sanitize_text_field( wp_unslash( $_POST['column_id'] ) ) : '';
+		$ids       = isset( $_POST['ids'] ) && is_array( $_POST['ids'] ) ? array_map( 'absint', wp_unslash( $_POST['ids'] ) ) : array();
+		AIEH_Tasks::set_column_order( $column_id, $ids );
+		wp_send_json_success();
+	}
+
+	/**
+	 * Add a column.
+	 */
+	public function column_add() {
+		$this->guard();
+		$label = isset( $_POST['label'] ) ? sanitize_text_field( wp_unslash( $_POST['label'] ) ) : '';
+		$col   = AIEH_Tasks::add_column( $label );
+		wp_send_json_success( array( 'column' => $col ) );
+	}
+
+	/**
+	 * Rename a column.
+	 */
+	public function column_rename() {
+		$this->guard();
+		$id    = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+		$label = isset( $_POST['label'] ) ? sanitize_text_field( wp_unslash( $_POST['label'] ) ) : '';
+		AIEH_Tasks::rename_column( $id, $label );
+		wp_send_json_success();
+	}
+
+	/**
+	 * Delete a column (cards move to the first remaining column).
+	 */
+	public function column_delete() {
+		$this->guard();
+		$id = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+		AIEH_Tasks::delete_column( $id );
+		wp_send_json_success( array( 'message' => __( 'Column deleted.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Reorder columns.
+	 */
+	public function column_reorder() {
+		$this->guard();
+		$ids = isset( $_POST['ids'] ) && is_array( $_POST['ids'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['ids'] ) ) : array();
+		AIEH_Tasks::reorder_columns( $ids );
+		wp_send_json_success();
+	}
+
+	/**
+	 * AI: assign priorities and sort the board.
+	 */
+	public function ai_prioritise() {
+		$this->guard();
+		$result = AIEH_Tasks::ai_prioritise();
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'message' => __( 'Board prioritised and sorted.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * AI: overview briefing of the board.
+	 */
+	public function ai_overview() {
+		$this->guard();
+		$overview = AIEH_Tasks::ai_overview();
+		if ( is_wp_error( $overview ) ) {
+			wp_send_json_error( array( 'message' => $overview->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'overview' => $overview ) );
 	}
 }

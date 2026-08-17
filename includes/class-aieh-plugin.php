@@ -21,6 +21,9 @@ class AIEH_Plugin {
 		add_action( 'admin_enqueue_scripts', array( $admin, 'enqueue_assets' ) );
 		add_action( 'admin_init', array( $admin, 'maybe_save_settings' ) );
 
+		// Create/upgrade DB tables for existing installs (e.g. new tasks table).
+		add_action( 'admin_init', array( 'AIEH_Activator', 'maybe_upgrade' ) );
+
 		// AJAX endpoints.
 		$ajax = new AIEH_Ajax();
 		$ajax->register();

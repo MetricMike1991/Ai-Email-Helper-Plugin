@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 
 $root       = $PSScriptRoot
 $pluginSlug = 'ai-email-helper'
-$version    = '0.1.0'
+$version    = '0.2.0'
 $zipName    = "$pluginSlug-$version.zip"
 $zipPath    = Join-Path $root $zipName
 
@@ -18,7 +18,7 @@ if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 $files = Get-ChildItem -Path $root -Recurse -File | Where-Object {
     $rel = $_.FullName.Substring($root.Length).TrimStart('\')
     $topSegment = $rel.Split('\')[0]
-    ($excludeDirs -notcontains $topSegment) -and ($excludeFiles -notcontains $rel)
+    ($excludeDirs -notcontains $topSegment) -and ($excludeFiles -notcontains $rel) -and ($_.Extension -ne '.zip')
 }
 
 $zip = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create)
