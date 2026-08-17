@@ -182,6 +182,8 @@ class AIEH_Imap_Client {
 		self::update_local_status( $message_id, 'replied' );
 	}
 
+	/**
+	 * List available mailbox folders on the server (cached for 1 hour).
 	 *
 	 * @param bool $force Bypass the cache.
 	 * @return array|WP_Error List of folder names (e.g. INBOX, INBOX.Sent).
