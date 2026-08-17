@@ -112,6 +112,7 @@ class AIEH_Imap_Client {
 		for ( $i = $total; $i >= $start; $i-- ) {
 			$uid = imap_uid( $stream, $i );
 			if ( self::message_exists( $uid, $folder ) ) {
+				self::maybe_backfill_body( $stream, $i, $uid, $folder );
 				continue;
 			}
 			$stored = self::store_message( $stream, $i, $uid, $folder );
@@ -123,6 +124,28 @@ class AIEH_Imap_Client {
 		imap_errors();
 		imap_close( $stream );
 		return $new;
+	}
+
+	/**
+	 * If a cached message has an empty body (e.g. fetched before nested-MIME
+	 * parsing was fixed), re-read and update just the body text.
+	 *
+	 * @param resource $stream IMAP stream.
+	 * @param int      $msgno  Message sequence number.
+	 * @param int      $uid    IMAP UID.
+	 * @param string   $folder Folder.
+	 */
+	private static function maybe_backfill_body( $stream, $msgno, $uid, $folder ) {
+		global $wpdb;
+		$table = AIEH_Activator::messages_table();
+		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT id, body_text FROM {$table} WHERE imap_uid = %d AND folder = %s", $uid, $folder ) ); // phpcs:ignore WordPress.DB
+		if ( ! $row || '' !== trim( (string) $row->body_text ) ) {
+			return;
+		}
+		$body = self::get_body( $stream, $msgno );
+		if ( '' !== trim( $body ) ) {
+			$wpdb->update( $table, array( 'body_text' => wp_kses_post( $body ) ), array( 'id' => (int) $row->id ), array( '%s' ), array( '%d' ) ); // phpcs:ignore WordPress.DB
+		}
 	}
 
 	/**
@@ -425,28 +448,64 @@ class AIEH_Imap_Client {
 			return self::decode_part( $body, isset( $structure->encoding ) ? $structure->encoding : 0 );
 		}
 
-		$plain = '';
-		$html  = '';
-		foreach ( $structure->parts as $index => $part ) {
-			$part_no = (string) ( $index + 1 );
-			$data    = imap_fetchbody( $stream, $msgno, $part_no, FT_PEEK );
-			$decoded = self::decode_part( $data, isset( $part->encoding ) ? $part->encoding : 0 );
-			$subtype = isset( $part->subtype ) ? strtoupper( $part->subtype ) : '';
+		// Walk the MIME tree (handles nested multipart/alternative etc.).
+		$found = array( 'plain' => '', 'html' => '' );
+		self::walk_parts( $stream, $msgno, $structure->parts, '', $found );
 
-			if ( 'PLAIN' === $subtype && '' === $plain ) {
-				$plain = $decoded;
-			} elseif ( 'HTML' === $subtype && '' === $html ) {
-				$html = $decoded;
-			}
+		if ( '' !== $found['plain'] ) {
+			return $found['plain'];
 		}
-
-		if ( '' !== $plain ) {
-			return $plain;
-		}
-		if ( '' !== $html ) {
-			return wp_strip_all_tags( $html );
+		if ( '' !== $found['html'] ) {
+			return wp_strip_all_tags( $found['html'] );
 		}
 		return '';
+	}
+
+	/**
+	 * Recursively collect the first plain-text and HTML body parts, skipping
+	 * attachments. Part numbers follow IMAP's dotted scheme (e.g. 1, 1.2, 2.1).
+	 *
+	 * @param resource $stream IMAP stream.
+	 * @param int      $msgno  Message number.
+	 * @param array    $parts  Structure parts.
+	 * @param string   $prefix Parent part-number prefix.
+	 * @param array    $found  Accumulator passed by reference.
+	 */
+	private static function walk_parts( $stream, $msgno, $parts, $prefix, &$found ) {
+		foreach ( $parts as $index => $part ) {
+			$part_no = ( '' === $prefix ) ? (string) ( $index + 1 ) : $prefix . '.' . ( $index + 1 );
+
+			// Nested multipart: recurse into its children.
+			if ( ! empty( $part->parts ) ) {
+				self::walk_parts( $stream, $msgno, $part->parts, $part_no, $found );
+				continue;
+			}
+
+			// Skip attachments.
+			if ( ! empty( $part->ifdisposition ) && 0 === strcasecmp( (string) $part->disposition, 'attachment' ) ) {
+				continue;
+			}
+
+			// Only text parts (IMAP type 0 = text).
+			$type = isset( $part->type ) ? (int) $part->type : 0;
+			if ( 0 !== $type ) {
+				continue;
+			}
+
+			$subtype = isset( $part->subtype ) ? strtoupper( $part->subtype ) : '';
+			if ( ( 'PLAIN' === $subtype && '' !== $found['plain'] ) || ( 'HTML' === $subtype && '' !== $found['html'] ) ) {
+				continue;
+			}
+
+			$data    = imap_fetchbody( $stream, $msgno, $part_no, FT_PEEK );
+			$decoded = self::decode_part( $data, isset( $part->encoding ) ? $part->encoding : 0 );
+
+			if ( 'PLAIN' === $subtype ) {
+				$found['plain'] = $decoded;
+			} elseif ( 'HTML' === $subtype ) {
+				$found['html'] = $decoded;
+			}
+		}
 	}
 
 	/**

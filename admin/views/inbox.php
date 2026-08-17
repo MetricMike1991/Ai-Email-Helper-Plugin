@@ -108,60 +108,63 @@ $tabs     = array(
 	<?php else : ?>
 		<div class="aieh-list">
 			<?php foreach ( $messages as $m ) : ?>
-				<?php $draft = $wpdb->get_var( $wpdb->prepare( "SELECT draft_text FROM {$drafts_t} WHERE message_id = %d ORDER BY created_at DESC LIMIT 1", $m->id ) ); // phpcs:ignore WordPress.DB ?>
 				<div class="aieh-card" data-id="<?php echo esc_attr( $m->id ); ?>" data-status="<?php echo esc_attr( $m->status ); ?>">
-					<div class="aieh-card-head">
+					<div class="aieh-card-head aieh-toggle">
+						<span class="aieh-caret" aria-hidden="true"></span>
 						<span class="aieh-from"><strong><?php echo esc_html( $m->from_name ? $m->from_name : $m->from_email ); ?></strong> &lt;<?php echo esc_html( $m->from_email ); ?>&gt;</span>
+						<?php if ( '' !== $m->category ) : ?><span class="aieh-cat-tag"><?php echo esc_html( $m->category ); ?></span><?php endif; ?>
 						<span class="aieh-date"><?php echo esc_html( $m->received_at ); ?></span>
 						<span class="aieh-badge aieh-status-<?php echo esc_attr( $m->status ); ?>"><?php echo esc_html( $m->status ); ?></span>
 					</div>
 
-					<div class="aieh-toolbar">
-						<button type="button" class="button-link aieh-mark-read" <?php echo 'unread' === $m->status ? '' : 'style="display:none"'; ?>><?php esc_html_e( 'Mark as Read', 'ai-email-helper' ); ?></button>
-						<button type="button" class="button-link aieh-mark-unread" <?php echo 'unread' === $m->status ? 'style="display:none"' : ''; ?>><?php esc_html_e( 'Mark as Unread', 'ai-email-helper' ); ?></button>
+					<div class="aieh-subject aieh-toggle"><?php echo esc_html( $m->subject ); ?></div>
 
-						<label class="aieh-tool-label"><?php esc_html_e( 'Category:', 'ai-email-helper' ); ?>
-							<select class="aieh-category-select">
-								<option value=""><?php esc_html_e( '— none —', 'ai-email-helper' ); ?></option>
-								<?php foreach ( $categories as $cat ) : ?>
-									<option value="<?php echo esc_attr( $cat ); ?>" <?php selected( $m->category, $cat ); ?>><?php echo esc_html( $cat ); ?></option>
-								<?php endforeach; ?>
-							</select>
-						</label>
+					<div class="aieh-card-body" hidden>
+						<div class="aieh-toolbar">
+							<button type="button" class="button-link aieh-mark-read" <?php echo 'unread' === $m->status ? '' : 'style="display:none"'; ?>><?php esc_html_e( 'Mark as Read', 'ai-email-helper' ); ?></button>
+							<button type="button" class="button-link aieh-mark-unread" <?php echo 'unread' === $m->status ? 'style="display:none"' : ''; ?>><?php esc_html_e( 'Mark as Unread', 'ai-email-helper' ); ?></button>
 
-						<?php if ( ! empty( $folders ) ) : ?>
-							<label class="aieh-tool-label"><?php esc_html_e( 'Move to:', 'ai-email-helper' ); ?>
-								<select class="aieh-move-select">
-									<option value=""><?php esc_html_e( '— choose folder —', 'ai-email-helper' ); ?></option>
-									<?php foreach ( $folders as $folder ) : ?>
-										<?php if ( 'INBOX' === $folder ) { continue; } ?>
-										<option value="<?php echo esc_attr( $folder ); ?>"><?php echo esc_html( $folder ); ?></option>
+							<label class="aieh-tool-label"><?php esc_html_e( 'Category:', 'ai-email-helper' ); ?>
+								<select class="aieh-category-select">
+									<option value=""><?php esc_html_e( '— none —', 'ai-email-helper' ); ?></option>
+									<?php foreach ( $categories as $cat ) : ?>
+										<option value="<?php echo esc_attr( $cat ); ?>" <?php selected( $m->category, $cat ); ?>><?php echo esc_html( $cat ); ?></option>
 									<?php endforeach; ?>
 								</select>
 							</label>
-						<?php endif; ?>
-					</div>
 
-					<div class="aieh-subject"><?php echo esc_html( $m->subject ); ?></div>
+							<?php if ( ! empty( $folders ) ) : ?>
+								<label class="aieh-tool-label"><?php esc_html_e( 'Move to:', 'ai-email-helper' ); ?>
+									<select class="aieh-move-select">
+										<option value=""><?php esc_html_e( '— choose folder —', 'ai-email-helper' ); ?></option>
+										<?php foreach ( $folders as $folder ) : ?>
+											<?php if ( 'INBOX' === $folder ) { continue; } ?>
+											<option value="<?php echo esc_attr( $folder ); ?>"><?php echo esc_html( $folder ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</label>
+							<?php endif; ?>
+						</div>
 
-					<div class="aieh-summary <?php echo $m->summary ? '' : 'is-empty'; ?>">
-						<?php echo $m->summary ? esc_html( $m->summary ) : ''; ?>
-					</div>
+						<div class="aieh-summary <?php echo $m->summary ? '' : 'is-empty'; ?>">
+							<?php echo $m->summary ? esc_html( $m->summary ) : ''; ?>
+						</div>
 
-					<details class="aieh-body">
-						<summary><?php esc_html_e( 'View full email', 'ai-email-helper' ); ?></summary>
-						<pre><?php echo esc_html( $m->body_text ); ?></pre>
-					</details>
+						<details class="aieh-body">
+							<summary><?php esc_html_e( 'View full email', 'ai-email-helper' ); ?></summary>
+							<pre><?php echo esc_html( $m->body_text ); ?></pre>
+						</details>
 
-					<div class="aieh-actions">
-						<button type="button" class="button aieh-summarize"><?php esc_html_e( 'Summarize', 'ai-email-helper' ); ?></button>
-						<button type="button" class="button aieh-draft"><?php esc_html_e( 'Suggest Reply', 'ai-email-helper' ); ?></button>
-					</div>
-
-					<div class="aieh-draft-area" <?php echo $draft ? '' : 'style="display:none"'; ?>>
-						<textarea class="aieh-draft-text" rows="6"><?php echo esc_textarea( (string) $draft ); ?></textarea>
 						<div class="aieh-actions">
-							<button type="button" class="button button-primary aieh-send"><?php esc_html_e( 'Approve & Send', 'ai-email-helper' ); ?></button>
+							<button type="button" class="button aieh-summarize"><?php esc_html_e( 'Summarize', 'ai-email-helper' ); ?></button>
+							<button type="button" class="button aieh-draft"><?php esc_html_e( 'Suggest Reply', 'ai-email-helper' ); ?></button>
+						</div>
+
+						<div class="aieh-draft-area" style="display:none">
+							<textarea class="aieh-draft-text" rows="6"></textarea>
+							<div class="aieh-actions">
+								<button type="button" class="button button-primary aieh-send"><?php esc_html_e( 'Approve & Send', 'ai-email-helper' ); ?></button>
+							</div>
 						</div>
 					</div>
 

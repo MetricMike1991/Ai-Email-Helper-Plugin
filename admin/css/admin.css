@@ -16,8 +16,39 @@
 }
 .aieh-card[data-status="replied"] { border-left-color: #1a7f37; }
 .aieh-card[data-status="new"] { border-left-color: #d63638; }
-.aieh-card[data-status="unread"] { border-left-color: #d63638; }
+.aieh-card[data-status="unread"] { border-left-color: #d63638; background: #fbf6f6; }
+.aieh-card[data-status="unread"] .aieh-from strong,
+.aieh-card[data-status="unread"] .aieh-subject { font-weight: 700; }
 .aieh-card[data-status="read"] { border-left-color: #2271b1; }
+
+/* Collapsible card. */
+.aieh-card { padding: 10px 14px; }
+.aieh-toggle { cursor: pointer; }
+.aieh-caret {
+	display: inline-block;
+	width: 0; height: 0;
+	margin-right: 6px;
+	border-left: 5px solid #787c82;
+	border-top: 4px solid transparent;
+	border-bottom: 4px solid transparent;
+	transition: transform .15s ease;
+	vertical-align: middle;
+}
+.aieh-card.is-open .aieh-caret { transform: rotate( 90deg ); }
+.aieh-card .aieh-subject { margin: 4px 0; }
+.aieh-card:not( .is-open ) .aieh-subject {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.aieh-cat-tag {
+	font-size: 10px;
+	background: #e7edf5;
+	color: #1d4a7a;
+	border-radius: 10px;
+	padding: 1px 8px;
+}
+.aieh-card-body { margin-top: 8px; }
 
 .aieh-card-head {
 	display: flex;

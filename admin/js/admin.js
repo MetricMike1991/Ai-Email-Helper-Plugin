@@ -64,6 +64,16 @@
 		} );
 	} );
 
+	/* ---- Inbox: collapse / expand a card ---- */
+	$( '.aieh-list' ).on( 'click', '.aieh-toggle', function ( e ) {
+		if ( $( e.target ).closest( 'a, button, select, textarea' ).length ) {
+			return;
+		}
+		var $card = $( this ).closest( '.aieh-card' );
+		var open = $card.toggleClass( 'is-open' ).hasClass( 'is-open' );
+		$card.children( '.aieh-card-body' ).prop( 'hidden', ! open );
+	} );
+
 	/* ---- Inbox: mark read / unread (mirrors the IMAP server) ---- */
 	function setCardStatus( $card, status ) {
 		$card.attr( 'data-status', status );
