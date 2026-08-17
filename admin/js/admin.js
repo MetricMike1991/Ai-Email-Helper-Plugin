@@ -447,8 +447,19 @@
 				notes: $f.find( '.aieh-tf-notes' ).val(),
 				priority: $f.find( '.aieh-tf-priority' ).val(),
 				category: $f.find( '.aieh-tf-category' ).val(),
-				due_date: $f.find( '.aieh-tf-due' ).val()
+				due_date: $f.find( '.aieh-tf-due' ).val(),
+				recurrence: $f.find( '.aieh-tf-recurrence' ).val()
 			} ).done( function ( r ) {
+				if ( r.success ) {
+					window.location.reload();
+				}
+			} );
+		} );
+
+		/* Mark a card complete (timestamps + reschedules if recurring). */
+		$( '.aieh-board' ).on( 'click', '.aieh-task-complete', function () {
+			var $t = $( this ).closest( '.aieh-task' );
+			post( 'aieh_task_complete', { id: $t.data( 'id' ) } ).done( function ( r ) {
 				if ( r.success ) {
 					window.location.reload();
 				}

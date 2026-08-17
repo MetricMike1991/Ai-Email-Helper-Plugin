@@ -39,6 +39,7 @@ class AIEH_Ajax {
 			'aieh_add_to_todo'   => 'add_to_todo',
 			'aieh_task_create'   => 'task_create',
 			'aieh_task_update'   => 'task_update',
+			'aieh_task_complete' => 'task_complete',
 			'aieh_task_delete'   => 'task_delete',
 			'aieh_task_reorder'  => 'task_reorder',
 			'aieh_column_add'    => 'column_add',
@@ -435,8 +436,24 @@ class AIEH_Ajax {
 		if ( isset( $_POST['priority'] ) ) {
 			$data['priority'] = (int) $_POST['priority'];
 		}
+		if ( isset( $_POST['recurrence'] ) ) {
+			$data['recurrence'] = sanitize_key( wp_unslash( $_POST['recurrence'] ) );
+		}
 		AIEH_Tasks::update( $id, $data );
 		wp_send_json_success( array( 'message' => __( 'Card saved.', 'ai-email-helper' ) ) );
+	}
+
+	/**
+	 * Mark a task complete (timestamps notes; reschedules if recurring).
+	 */
+	public function task_complete() {
+		$this->guard();
+		$id = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		if ( ! $id ) {
+			wp_send_json_error( array( 'message' => __( 'Card not found.', 'ai-email-helper' ) ) );
+		}
+		AIEH_Tasks::complete( $id );
+		wp_send_json_success( array( 'message' => __( 'Marked complete.', 'ai-email-helper' ) ) );
 	}
 
 	/**

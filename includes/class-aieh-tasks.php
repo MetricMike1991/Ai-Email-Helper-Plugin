@@ -222,10 +222,11 @@ class AIEH_Tasks {
 				'email_from'    => isset( $data['email_from'] ) ? substr( sanitize_text_field( $data['email_from'] ), 0, 191 ) : '',
 				'email_subject' => isset( $data['email_subject'] ) ? sanitize_text_field( $data['email_subject'] ) : '',
 				'due_date'      => ! empty( $data['due_date'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $data['due_date'] ) ) : null,
+				'recurrence'    => isset( $data['recurrence'] ) ? self::clean_recurrence( $data['recurrence'] ) : '',
 				'created_at'    => current_time( 'mysql', true ),
 				'updated_at'    => current_time( 'mysql', true ),
 			),
-			array( '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 		return (int) $wpdb->insert_id;
 	}
@@ -260,8 +261,95 @@ class AIEH_Tasks {
 			$fields['due_date'] = ! empty( $data['due_date'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $data['due_date'] ) ) : null;
 			$formats[]          = '%s';
 		}
+		if ( isset( $data['recurrence'] ) ) {
+			$fields['recurrence'] = self::clean_recurrence( $data['recurrence'] );
+			$formats[]            = '%s';
+		}
 
 		$wpdb->update( $table, $fields, array( 'id' => (int) $id ), $formats, array( '%d' ) ); // phpcs:ignore WordPress.DB
+	}
+
+	/**
+	 * Normalise a recurrence value.
+	 */
+	private static function clean_recurrence( $value ) {
+		$value = sanitize_key( $value );
+		return in_array( $value, array( 'daily', 'weekly', 'monthly' ), true ) ? $value : '';
+	}
+
+	/**
+	 * Mark a task complete. Stamps a completion line into the notes and records
+	 * completed_at. Recurring tasks are rescheduled to their next due date and
+	 * reopened in the first column; one-off tasks move to the done column.
+	 *
+	 * @param int $id Task id.
+	 */
+	public static function complete( $id ) {
+		global $wpdb;
+		$table = AIEH_Activator::tasks_table();
+		$task  = self::get( $id );
+		if ( ! $task ) {
+			return;
+		}
+
+		$now_utc   = current_time( 'mysql', true );
+		$stamp     = current_time( 'mysql' ); // Local time, for a readable note.
+		$note_line = '✔ ' . sprintf( /* translators: %s: date/time */ __( 'Completed %s', 'ai-email-helper' ), $stamp );
+		$notes     = trim( (string) $task->notes );
+		$notes     = '' !== $notes ? $notes . "\n" . $note_line : $note_line;
+
+		$recurrence = self::clean_recurrence( $task->recurrence );
+
+		if ( '' !== $recurrence ) {
+			$base = ! empty( $task->due_date ) ? strtotime( $task->due_date ) : time();
+			$from = max( time(), $base );
+			$next = self::next_due( $recurrence, $from );
+			$wpdb->update( // phpcs:ignore WordPress.DB
+				$table,
+				array(
+					'notes'        => $notes,
+					'completed_at' => $now_utc,
+					'due_date'     => gmdate( 'Y-m-d H:i:s', $next ),
+					'column_id'    => self::first_column_id(),
+					'updated_at'   => $now_utc,
+				),
+				array( 'id' => (int) $id ),
+				array( '%s', '%s', '%s', '%s', '%s' ),
+				array( '%d' )
+			);
+		} else {
+			$wpdb->update( // phpcs:ignore WordPress.DB
+				$table,
+				array(
+					'notes'        => $notes,
+					'completed_at' => $now_utc,
+					'column_id'    => self::done_column_id(),
+					'updated_at'   => $now_utc,
+				),
+				array( 'id' => (int) $id ),
+				array( '%s', '%s', '%s', '%s' ),
+				array( '%d' )
+			);
+		}
+	}
+
+	/**
+	 * Next due timestamp for a recurrence starting from a given time.
+	 *
+	 * @param string $recurrence daily|weekly|monthly.
+	 * @param int    $from       Base unix timestamp.
+	 * @return int
+	 */
+	private static function next_due( $recurrence, $from ) {
+		switch ( $recurrence ) {
+			case 'daily':
+				return strtotime( '+1 day', $from );
+			case 'weekly':
+				return strtotime( '+1 week', $from );
+			case 'monthly':
+				return strtotime( '+1 month', $from );
+		}
+		return $from;
 	}
 
 	/**
@@ -367,6 +455,8 @@ class AIEH_Tasks {
 				'category'   => $t->category,
 				'due_date'   => $t->due_date,
 				'created'    => $t->created_at,
+				'recurrence' => $t->recurrence,
+				'last_completed' => $t->completed_at,
 				'column_now' => $t->column_id,
 			);
 		}
@@ -378,7 +468,7 @@ class AIEH_Tasks {
 		$messages = array(
 			array(
 				'role'    => 'system',
-				'content' => 'You organise a Kanban board. You are given the available columns (each with an "about" description of what belongs there), the current date/time, and a list of tasks. For EACH task: (1) choose the best column_id from the provided columns by matching the task to the column descriptions; (2) assign a priority 3=high/urgent, 2=medium, 1=low, considering due dates (overdue or soon = higher), importance and age. Only use column_id values from the provided columns. Respond with ONLY a compact JSON array like [{"id":12,"column_id":"todo","priority":3}] — no markdown, no commentary.',
+				'content' => 'You organise a Kanban board. You are given the available columns (each with an "about" description of what belongs there), the current date/time, and a list of tasks. For EACH task: (1) choose the best column_id from the provided columns by matching the task to the column descriptions; (2) assign a priority 3=high/urgent, 2=medium, 1=low, considering due dates (overdue or soon = higher), recurring tasks whose next due date has passed or is near, importance and age. Only use column_id values from the provided columns. Respond with ONLY a compact JSON array like [{"id":12,"column_id":"todo","priority":3}] — no markdown, no commentary.',
 			),
 			array(
 				'role'    => 'user',
@@ -462,6 +552,8 @@ class AIEH_Tasks {
 				'column'   => isset( $labels[ $t->column_id ] ) ? $labels[ $t->column_id ] : $t->column_id,
 				'priority' => (int) $t->priority,
 				'due_date' => $t->due_date,
+				'recurrence' => $t->recurrence,
+				'last_completed' => $t->completed_at,
 				'done'     => ( $t->column_id === $done_id ),
 			);
 		}
@@ -469,7 +561,7 @@ class AIEH_Tasks {
 		$messages = array(
 			array(
 				'role'    => 'system',
-				'content' => 'You are a concise executive assistant. Given the current date/time and a JSON list of Kanban tasks, write a short briefing (a few sentences plus a short bullet list) of what is most important, what is overdue or due soon, and what the user should tackle next. Ignore tasks already in the done column except to acknowledge progress. Plain text only.',
+				'content' => 'You are a concise executive assistant. Given the current date/time and a JSON list of Kanban tasks, write a short briefing (a few sentences plus a short bullet list) of what is most important, what is overdue or due soon, and what the user should tackle next. Pay attention to recurring tasks: use "recurrence" and "last_completed" to point out anything weekly/monthly that is due again based on how long it has been. Ignore tasks already in the done column except to acknowledge progress. Plain text only.',
 			),
 			array(
 				'role'    => 'user',

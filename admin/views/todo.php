@@ -18,6 +18,12 @@ $priorities = array(
 	2 => __( 'Medium', 'ai-email-helper' ),
 	3 => __( 'High', 'ai-email-helper' ),
 );
+$recurrences = array(
+	''        => __( 'No repeat', 'ai-email-helper' ),
+	'daily'   => __( 'Daily', 'ai-email-helper' ),
+	'weekly'  => __( 'Weekly', 'ai-email-helper' ),
+	'monthly' => __( 'Monthly', 'ai-email-helper' ),
+);
 
 $by_col = array();
 foreach ( $tasks as $t ) {
@@ -64,16 +70,24 @@ foreach ( $tasks as $t ) {
 									<?php if ( ! empty( $t->due_date ) && '0000-00-00 00:00:00' !== $t->due_date ) : ?>
 										<span class="aieh-due">📅 <?php echo esc_html( gmdate( 'j M Y', strtotime( $t->due_date ) ) ); ?></span>
 									<?php endif; ?>
+									<?php if ( ! empty( $t->recurrence ) ) : ?>
+										<span class="aieh-recur">🔁 <?php echo esc_html( isset( $recurrences[ $t->recurrence ] ) ? $recurrences[ $t->recurrence ] : $t->recurrence ); ?></span>
+									<?php endif; ?>
 									<?php if ( 'email' === $t->source ) : ?>
 										<span class="aieh-task-badge" title="<?php echo esc_attr( $t->email_subject ); ?>">✉ <?php echo esc_html( $t->email_from ? $t->email_from : __( 'from email', 'ai-email-helper' ) ); ?></span>
 									<?php endif; ?>
 								</div>
+
+								<?php if ( ! empty( $t->completed_at ) ) : ?>
+									<div class="aieh-last-done">✔ <?php echo esc_html( sprintf( /* translators: %s: date */ __( 'Last completed %s', 'ai-email-helper' ), gmdate( 'j M Y H:i', strtotime( $t->completed_at ) ) ) ); ?></div>
+								<?php endif; ?>
 
 								<?php if ( '' !== trim( (string) $t->notes ) ) : ?>
 									<div class="aieh-task-notes"><?php echo nl2br( esc_html( $t->notes ) ); ?></div>
 								<?php endif; ?>
 
 								<div class="aieh-task-actions">
+									<button type="button" class="button-link aieh-task-complete"><?php esc_html_e( 'Complete', 'ai-email-helper' ); ?></button>
 									<button type="button" class="button-link aieh-task-edit"><?php esc_html_e( 'Edit', 'ai-email-helper' ); ?></button>
 									<button type="button" class="button-link aieh-task-delete"><?php esc_html_e( 'Delete', 'ai-email-helper' ); ?></button>
 								</div>
@@ -99,6 +113,13 @@ foreach ( $tasks as $t ) {
 										</label>
 										<label><?php esc_html_e( 'Due', 'ai-email-helper' ); ?>
 											<input type="date" class="aieh-tf-due" value="<?php echo ! empty( $t->due_date ) ? esc_attr( gmdate( 'Y-m-d', strtotime( $t->due_date ) ) ) : ''; ?>">
+										</label>
+										<label><?php esc_html_e( 'Repeat', 'ai-email-helper' ); ?>
+											<select class="aieh-tf-recurrence">
+												<?php foreach ( $recurrences as $rv => $rl ) : ?>
+													<option value="<?php echo esc_attr( $rv ); ?>" <?php selected( (string) $t->recurrence, $rv ); ?>><?php echo esc_html( $rl ); ?></option>
+												<?php endforeach; ?>
+											</select>
 										</label>
 									</div>
 									<div class="aieh-actions">

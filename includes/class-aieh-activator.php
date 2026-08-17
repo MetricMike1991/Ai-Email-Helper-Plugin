@@ -143,6 +143,8 @@ class AIEH_Activator {
 			email_from VARCHAR(191) NOT NULL DEFAULT '',
 			email_subject TEXT NULL,
 			due_date DATETIME NULL,
+			recurrence VARCHAR(20) NOT NULL DEFAULT '',
+			completed_at DATETIME NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NULL,
 			PRIMARY KEY  (id),

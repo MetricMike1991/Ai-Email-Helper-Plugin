@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 
 $root       = $PSScriptRoot
 $pluginSlug = 'ai-email-helper'
-$version    = '0.2.0'
+$version    = '0.3.0'
 $zipName    = "$pluginSlug-$version.zip"
 $zipPath    = Join-Path $root $zipName
 

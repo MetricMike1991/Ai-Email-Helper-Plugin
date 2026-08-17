@@ -227,6 +227,8 @@
 .aieh-prio-badge.prio-2 { background: #dba617; }
 .aieh-prio-badge.prio-3 { background: #d63638; }
 .aieh-due { font-size: 11px; color: #50575e; }
+.aieh-recur { font-size: 11px; color: #2271b1; }
+.aieh-last-done { font-size: 11px; color: #1a7f37; margin-bottom: 4px; }
 .aieh-task-badge { font-size: 10px; background: #eef3f8; color: #1d4a7a; border-radius: 10px; padding: 1px 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aieh-task-notes { font-size: 12px; color: #3c434a; white-space: pre-wrap; margin-bottom: 6px; }
 .aieh-task-actions { display: flex; gap: 10px; font-size: 12px; }
