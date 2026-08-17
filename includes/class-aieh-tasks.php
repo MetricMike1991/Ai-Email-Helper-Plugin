@@ -572,6 +572,251 @@ class AIEH_Tasks {
 		return AIEH_OpenAI_Client::chat( $messages, array( 'max_tokens' => 500, 'temperature' => 0.4 ) );
 	}
 
+	/* ---------------------------------------------------------------------
+	 * Chat assistant
+	 * ------------------------------------------------------------------- */
+
+	/**
+	 * Conversational assistant that can both discuss the board and perform
+	 * actions on it. Returns array( 'reply' => string, 'changed' => bool ).
+	 *
+	 * @param string $message User's latest message.
+	 * @param array  $history Prior turns [ ['role'=>'user'|'assistant','content'=>''], ... ].
+	 * @return array|WP_Error
+	 */
+	public static function chat( $message, $history = array() ) {
+		$columns  = self::columns();
+		$col_ctx  = array();
+		foreach ( $columns as $c ) {
+			$col_ctx[] = array( 'id' => $c['id'], 'label' => $c['label'], 'about' => $c['description'] );
+		}
+		$tasks    = self::all();
+		$task_ctx = array();
+		foreach ( $tasks as $t ) {
+			$task_ctx[] = array(
+				'id'             => (int) $t->id,
+				'title'          => $t->title,
+				'column'         => $t->column_id,
+				'priority'       => (int) $t->priority,
+				'category'       => $t->category,
+				'due_date'       => $t->due_date,
+				'recurrence'     => $t->recurrence,
+				'last_completed' => $t->completed_at,
+				'notes'          => mb_substr( (string) $t->notes, 0, 300 ),
+			);
+		}
+
+		$system  = "You are the assistant for the user's Kanban to-do board. You can chat about it and also make changes. ";
+		$system .= "Respond with ONLY a JSON object: {\"reply\":\"<message to the user>\",\"actions\":[...]} and nothing else. ";
+		$system .= "Available actions: ";
+		$system .= '{"type":"create_task","title":"..","notes":"..","column":"<id or label>","priority":"low|medium|high","category":"..","due_date":"YYYY-MM-DD","recurrence":"daily|weekly|monthly"}; ';
+		$system .= '{"type":"update_task","id":N,...same fields...}; ';
+		$system .= '{"type":"move_task","id":N,"column":"<id or label>"}; ';
+		$system .= '{"type":"complete_task","id":N}; ';
+		$system .= '{"type":"delete_task","id":N}; ';
+		$system .= '{"type":"add_column","label":"..","description":".."}; ';
+		$system .= '{"type":"prioritise_board"}. ';
+		$system .= "Use task ids exactly as given in the board context. If the user is only asking a question or chatting, return an empty actions array and answer in 'reply'. Confirm any changes you make in 'reply'. Keep replies concise. Current date/time: " . current_time( 'mysql' ) . '.';
+
+		$messages   = array();
+		$messages[] = array( 'role' => 'system', 'content' => $system );
+		$messages[] = array( 'role' => 'system', 'content' => "Board columns:\n" . wp_json_encode( $col_ctx ) . "\n\nBoard tasks:\n" . wp_json_encode( $task_ctx ) );
+
+		foreach ( (array) $history as $h ) {
+			if ( ! isset( $h['role'], $h['content'] ) ) {
+				continue;
+			}
+			$messages[] = array(
+				'role'    => ( 'assistant' === $h['role'] ) ? 'assistant' : 'user',
+				'content' => (string) $h['content'],
+			);
+		}
+		$messages[] = array( 'role' => 'user', 'content' => (string) $message );
+
+		$resp = AIEH_OpenAI_Client::chat( $messages, array( 'max_tokens' => 900, 'temperature' => 0.3 ) );
+		if ( is_wp_error( $resp ) ) {
+			return $resp;
+		}
+
+		$data    = self::extract_json_object( $resp );
+		$reply   = ( is_array( $data ) && isset( $data['reply'] ) ) ? (string) $data['reply'] : $resp;
+		$actions = ( is_array( $data ) && isset( $data['actions'] ) && is_array( $data['actions'] ) ) ? $data['actions'] : array();
+		$changed = self::apply_actions( $actions );
+
+		return array( 'reply' => $reply, 'changed' => $changed );
+	}
+
+	/**
+	 * Execute a list of chat actions. Returns whether the board changed.
+	 *
+	 * @param array $actions Action objects from the assistant.
+	 * @return bool
+	 */
+	public static function apply_actions( array $actions ) {
+		$changed = false;
+		foreach ( $actions as $a ) {
+			if ( ! is_array( $a ) || empty( $a['type'] ) ) {
+				continue;
+			}
+			switch ( sanitize_key( $a['type'] ) ) {
+				case 'create_task':
+					$title = isset( $a['title'] ) ? (string) $a['title'] : '';
+					if ( '' === trim( $title ) ) {
+						break;
+					}
+					$data = array(
+						'title'      => $title,
+						'notes'      => isset( $a['notes'] ) ? (string) $a['notes'] : '',
+						'priority'   => isset( $a['priority'] ) ? self::priority_from( $a['priority'] ) : 0,
+						'category'   => isset( $a['category'] ) ? (string) $a['category'] : '',
+						'due_date'   => isset( $a['due_date'] ) ? (string) $a['due_date'] : '',
+						'recurrence' => isset( $a['recurrence'] ) ? (string) $a['recurrence'] : '',
+					);
+					if ( ! empty( $a['column'] ) ) {
+						$col = self::resolve_column( $a['column'] );
+						if ( '' !== $col ) {
+							$data['column_id'] = $col;
+						}
+					}
+					self::create( $data );
+					$changed = true;
+					break;
+
+				case 'update_task':
+					if ( empty( $a['id'] ) ) {
+						break;
+					}
+					$data = array();
+					foreach ( array( 'title', 'notes', 'category', 'due_date', 'recurrence' ) as $f ) {
+						if ( isset( $a[ $f ] ) ) {
+							$data[ $f ] = (string) $a[ $f ];
+						}
+					}
+					if ( isset( $a['priority'] ) ) {
+						$data['priority'] = self::priority_from( $a['priority'] );
+					}
+					if ( ! empty( $data ) ) {
+						self::update( (int) $a['id'], $data );
+					}
+					if ( ! empty( $a['column'] ) ) {
+						$col = self::resolve_column( $a['column'] );
+						if ( '' !== $col ) {
+							self::move_to_column( (int) $a['id'], $col );
+						}
+					}
+					$changed = true;
+					break;
+
+				case 'move_task':
+					if ( ! empty( $a['id'] ) && ! empty( $a['column'] ) ) {
+						$col = self::resolve_column( $a['column'] );
+						if ( '' !== $col ) {
+							self::move_to_column( (int) $a['id'], $col );
+							$changed = true;
+						}
+					}
+					break;
+
+				case 'complete_task':
+					if ( ! empty( $a['id'] ) ) {
+						self::complete( (int) $a['id'] );
+						$changed = true;
+					}
+					break;
+
+				case 'delete_task':
+					if ( ! empty( $a['id'] ) ) {
+						self::delete( (int) $a['id'] );
+						$changed = true;
+					}
+					break;
+
+				case 'add_column':
+					if ( ! empty( $a['label'] ) ) {
+						self::add_column( $a['label'], isset( $a['description'] ) ? $a['description'] : '' );
+						$changed = true;
+					}
+					break;
+
+				case 'prioritise_board':
+					self::ai_prioritise();
+					$changed = true;
+					break;
+			}
+		}
+		return $changed;
+	}
+
+	/**
+	 * Resolve a column id or label to a valid column id ('' if unknown).
+	 */
+	public static function resolve_column( $value ) {
+		$value = trim( (string) $value );
+		if ( '' === $value ) {
+			return '';
+		}
+		foreach ( self::columns() as $col ) {
+			if ( $col['id'] === $value ) {
+				return $col['id'];
+			}
+		}
+		foreach ( self::columns() as $col ) {
+			if ( 0 === strcasecmp( $col['label'], $value ) ) {
+				return $col['id'];
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * Move a task to a column (append at the end).
+	 */
+	public static function move_to_column( $id, $column_id ) {
+		if ( ! self::column_exists( $column_id ) ) {
+			return;
+		}
+		global $wpdb;
+		$table = AIEH_Activator::tasks_table();
+		$pos   = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(MAX(position),-1)+1 FROM {$table} WHERE column_id = %s", $column_id ) ); // phpcs:ignore WordPress.DB
+		$wpdb->update( // phpcs:ignore WordPress.DB
+			$table,
+			array( 'column_id' => $column_id, 'position' => $pos, 'updated_at' => current_time( 'mysql', true ) ),
+			array( 'id' => (int) $id ),
+			array( '%s', '%d', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	/**
+	 * Normalise a priority value (int or low/medium/high) to 0-3.
+	 */
+	private static function priority_from( $value ) {
+		if ( is_numeric( $value ) ) {
+			return max( 0, min( 3, (int) $value ) );
+		}
+		$map = array( 'none' => 0, 'low' => 1, 'medium' => 2, 'med' => 2, 'high' => 3, 'urgent' => 3 );
+		$key = strtolower( trim( (string) $value ) );
+		return isset( $map[ $key ] ) ? $map[ $key ] : 0;
+	}
+
+	/**
+	 * Pull the first JSON object out of a model response.
+	 *
+	 * @param string $text Raw response.
+	 * @return array
+	 */
+	private static function extract_json_object( $text ) {
+		$text  = trim( (string) $text );
+		$start = strpos( $text, '{' );
+		$end   = strrpos( $text, '}' );
+		if ( false === $start || false === $end || $end < $start ) {
+			return array();
+		}
+		$json = substr( $text, $start, $end - $start + 1 );
+		$data = json_decode( $json, true );
+		return is_array( $data ) ? $data : array();
+	}
+
 	/**
 	 * Pull the first JSON array out of a model response.
 	 *

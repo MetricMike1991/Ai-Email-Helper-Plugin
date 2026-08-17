@@ -35,10 +35,22 @@ foreach ( $tasks as $t ) {
 		<?php esc_html_e( 'AI Email Helper — To-Do Board', 'ai-email-helper' ); ?>
 		<button type="button" class="button button-primary" id="aieh-ai-prioritise"><?php esc_html_e( 'AI Prioritise &amp; Sort', 'ai-email-helper' ); ?></button>
 		<button type="button" class="button" id="aieh-ai-overview"><?php esc_html_e( 'AI Overview', 'ai-email-helper' ); ?></button>
+		<button type="button" class="button" id="aieh-chat-toggle"><?php esc_html_e( 'Chat with AI', 'ai-email-helper' ); ?></button>
 		<span class="aieh-inline-status" id="aieh-todo-status"></span>
 	</h1>
 
 	<div id="aieh-overview-panel" class="aieh-overview-panel" hidden></div>
+
+	<div id="aieh-chat" class="aieh-chat" hidden>
+		<div class="aieh-chat-log" id="aieh-chat-log"></div>
+		<div class="aieh-chat-input">
+			<textarea id="aieh-chat-text" rows="2" placeholder="<?php esc_attr_e( 'Ask or tell the AI… e.g. “add a weekly task to check the boiler on Fridays” or “move the invoice card to Done”', 'ai-email-helper' ); ?>"></textarea>
+			<div class="aieh-chat-buttons">
+				<button type="button" class="button button-primary" id="aieh-chat-send"><?php esc_html_e( 'Send', 'ai-email-helper' ); ?></button>
+				<button type="button" class="button-link" id="aieh-chat-clear"><?php esc_html_e( 'Clear', 'ai-email-helper' ); ?></button>
+			</div>
+		</div>
+	</div>
 
 	<div class="aieh-add-column">
 		<input type="text" id="aieh-new-column" placeholder="<?php esc_attr_e( 'New column name…', 'ai-email-helper' ); ?>">

@@ -49,6 +49,7 @@ class AIEH_Ajax {
 			'aieh_column_reorder' => 'column_reorder',
 			'aieh_ai_prioritise' => 'ai_prioritise',
 			'aieh_ai_overview'   => 'ai_overview',
+			'aieh_todo_chat'     => 'todo_chat',
 		);
 		foreach ( $actions as $action => $method ) {
 			add_action( "wp_ajax_{$action}", array( $this, $method ) );
@@ -552,5 +553,36 @@ class AIEH_Ajax {
 			wp_send_json_error( array( 'message' => $overview->get_error_message() ) );
 		}
 		wp_send_json_success( array( 'overview' => $overview ) );
+	}
+
+	/**
+	 * Conversational To-Do assistant that can also perform actions.
+	 */
+	public function todo_chat() {
+		$this->guard();
+		$message = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
+		if ( '' === trim( $message ) ) {
+			wp_send_json_error( array( 'message' => __( 'Type a message first.', 'ai-email-helper' ) ) );
+		}
+
+		$history_raw = isset( $_POST['history'] ) ? wp_unslash( $_POST['history'] ) : '[]';
+		$history     = json_decode( $history_raw, true );
+		$clean       = array();
+		if ( is_array( $history ) ) {
+			foreach ( array_slice( $history, -10 ) as $h ) {
+				if ( isset( $h['role'], $h['content'] ) ) {
+					$clean[] = array(
+						'role'    => ( 'assistant' === $h['role'] ) ? 'assistant' : 'user',
+						'content' => sanitize_textarea_field( (string) $h['content'] ),
+					);
+				}
+			}
+		}
+
+		$result = AIEH_Tasks::chat( $message, $clean );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'reply' => $result['reply'], 'changed' => (bool) $result['changed'] ) );
 	}
 }

@@ -550,6 +550,94 @@
 				busy( $btn, false );
 			} );
 		} );
+
+		/* ---- Chat assistant ---- */
+		var chatHistory = [];
+		try {
+			chatHistory = JSON.parse( window.sessionStorage.getItem( 'aieh_chat_history' ) || '[]' );
+		} catch ( e ) {
+			chatHistory = [];
+		}
+
+		function renderChat() {
+			var html = '';
+			chatHistory.forEach( function ( m ) {
+				var cls = 'assistant' === m.role ? 'aieh-chat-ai' : 'aieh-chat-user';
+				html += '<div class="aieh-chat-msg ' + cls + '"></div>';
+			} );
+			var $log = $( '#aieh-chat-log' ).html( html );
+			$log.children( '.aieh-chat-msg' ).each( function ( i ) {
+				$( this ).text( chatHistory[ i ].content );
+			} );
+			$log.scrollTop( $log[ 0 ].scrollHeight );
+		}
+
+		function saveChat() {
+			try {
+				window.sessionStorage.setItem( 'aieh_chat_history', JSON.stringify( chatHistory ) );
+			} catch ( e ) {}
+		}
+
+		if ( 'true' === window.sessionStorage.getItem( 'aieh_chat_open' ) ) {
+			$( '#aieh-chat' ).prop( 'hidden', false );
+			renderChat();
+		}
+
+		$( '#aieh-chat-toggle' ).on( 'click', function () {
+			var $c = $( '#aieh-chat' );
+			var open = $c.prop( 'hidden' );
+			$c.prop( 'hidden', ! open );
+			window.sessionStorage.setItem( 'aieh_chat_open', open ? 'true' : 'false' );
+			if ( open ) {
+				renderChat();
+				$( '#aieh-chat-text' ).focus();
+			}
+		} );
+
+		$( '#aieh-chat-clear' ).on( 'click', function () {
+			chatHistory = [];
+			saveChat();
+			renderChat();
+		} );
+
+		function sendChat() {
+			var text = $( '#aieh-chat-text' ).val().trim();
+			if ( ! text ) {
+				return;
+			}
+			chatHistory.push( { role: 'user', content: text } );
+			renderChat();
+			saveChat();
+			$( '#aieh-chat-text' ).val( '' );
+
+			var $send = $( '#aieh-chat-send' );
+			busy( $send, true );
+			$todoStatus.text( AIEH.i18n.working ).removeClass( 'is-error is-ok' );
+			post( 'aieh_todo_chat', { message: text, history: JSON.stringify( chatHistory.slice( 0, -1 ) ) } ).done( function ( r ) {
+				if ( r.success ) {
+					chatHistory.push( { role: 'assistant', content: r.data.reply } );
+					saveChat();
+					$todoStatus.text( '' );
+					if ( r.data.changed ) {
+						window.location.reload();
+					} else {
+						renderChat();
+					}
+				} else {
+					$todoStatus.text( r.data.message ).addClass( 'is-error' );
+				}
+			} ).always( function () {
+				busy( $send, false );
+			} );
+		}
+
+		$( '#aieh-chat-send' ).on( 'click', sendChat );
+		$( '#aieh-chat-text' ).on( 'keydown', function ( e ) {
+			if ( 13 === e.which && ! e.shiftKey ) {
+				e.preventDefault();
+				sendChat();
+			}
+		} );
 	}
 
 } )( jQuery );
