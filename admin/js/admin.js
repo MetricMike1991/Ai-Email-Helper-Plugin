@@ -180,6 +180,38 @@
 		} );
 	} );
 
+	/* ---- Write a reply from scratch ---- */
+	$( '.aieh-list' ).on( 'click', '.aieh-write', function () {
+		var $card = $( this ).closest( '.aieh-card' );
+		$card.find( '.aieh-draft-area' ).show();
+		$card.find( '.aieh-draft-text' ).focus();
+	} );
+
+	/* ---- Polish the typed reply: improve wording + match tone ---- */
+	$( '.aieh-list' ).on( 'click', '.aieh-polish', function () {
+		var $card = $( this ).closest( '.aieh-card' );
+		var $ta = $card.find( '.aieh-draft-text' );
+		var body = $ta.val();
+		var $btn = $( this );
+		var $status = $card.find( '.aieh-card-status' ).removeClass( 'is-error is-ok' );
+		if ( ! body.trim() ) {
+			$status.text( 'Type a reply first.' ).addClass( 'is-error' );
+			return;
+		}
+		$status.text( AIEH.i18n.working );
+		busy( $btn, true );
+		post( 'aieh_polish', { id: $card.data( 'id' ), body: body } ).done( function ( r ) {
+			if ( r.success ) {
+				$ta.val( r.data.body );
+				$status.text( 'Polished — review then Approve & Send.' ).addClass( 'is-ok' );
+			} else {
+				$status.text( r.data.message ).addClass( 'is-error' );
+			}
+		} ).always( function () {
+			busy( $btn, false );
+		} );
+	} );
+
 	$( '.aieh-list' ).on( 'click', '.aieh-send', function () {
 		if ( ! window.confirm( AIEH.i18n.confirm ) ) {
 			return;

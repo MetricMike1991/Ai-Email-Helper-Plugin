@@ -158,11 +158,13 @@ $tabs     = array(
 						<div class="aieh-actions">
 							<button type="button" class="button aieh-summarize"><?php esc_html_e( 'Summarize', 'ai-email-helper' ); ?></button>
 							<button type="button" class="button aieh-draft"><?php esc_html_e( 'Suggest Reply', 'ai-email-helper' ); ?></button>
+							<button type="button" class="button aieh-write"><?php esc_html_e( 'Write Reply', 'ai-email-helper' ); ?></button>
 						</div>
 
 						<div class="aieh-draft-area" style="display:none">
-							<textarea class="aieh-draft-text" rows="6"></textarea>
+							<textarea class="aieh-draft-text" rows="6" placeholder="<?php esc_attr_e( 'Type your reply here, then optionally polish it…', 'ai-email-helper' ); ?>"></textarea>
 							<div class="aieh-actions">
+								<button type="button" class="button aieh-polish"><?php esc_html_e( 'Improve & match my tone', 'ai-email-helper' ); ?></button>
 								<button type="button" class="button button-primary aieh-send"><?php esc_html_e( 'Approve & Send', 'ai-email-helper' ); ?></button>
 							</div>
 						</div>

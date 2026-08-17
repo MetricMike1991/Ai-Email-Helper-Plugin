@@ -29,6 +29,7 @@ class AIEH_Ajax {
 			'aieh_update_learning' => 'update_learning',
 			'aieh_delete_learning' => 'delete_learning',
 			'aieh_ai_revise'     => 'ai_revise',
+			'aieh_polish'        => 'polish',
 			'aieh_mark_read'     => 'mark_read',
 			'aieh_mark_unread'   => 'mark_unread',
 			'aieh_move'          => 'move',
@@ -240,6 +241,47 @@ class AIEH_Ajax {
 		}
 
 		wp_send_json_success( array( 'revised' => $revised ) );
+	}
+
+	/**
+	 * Polish a reply the user typed: improve wording and match their tone from
+	 * previously approved replies, without changing the meaning. Returns the
+	 * improved text only — the user still edits/sends it.
+	 */
+	public function polish() {
+		$this->guard();
+		$id   = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		$body = isset( $_POST['body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['body'] ) ) : '';
+
+		if ( '' === trim( $body ) ) {
+			wp_send_json_error( array( 'message' => __( 'Write a reply first, then polish it.', 'ai-email-helper' ) ) );
+		}
+
+		$examples = AIEH_Learning_Store::examples_context();
+		$msg      = AIEH_Email_Processor::get_message( $id );
+
+		$system  = 'You improve an email reply written by the user. Fix grammar and spelling, make it clear, professional and well structured, but DO NOT change the facts, meaning, commitments, or add information. Keep it concise and preserve the user\'s intent. Output only the improved reply body — no preamble, no quotes, no subject line.';
+		if ( '' !== $examples ) {
+			$system .= "\n\n" . $examples . "\n\nMatch the tone and style shown in those examples.";
+		}
+
+		$user = '';
+		if ( $msg ) {
+			$user .= "For context, this reply is to:\nSubject: {$msg->subject}\nFrom: {$msg->from_name} <{$msg->from_email}>\n\n----\n\n";
+		}
+		$user .= "Improve this draft reply:\n" . $body;
+
+		$messages = array(
+			array( 'role' => 'system', 'content' => $system ),
+			array( 'role' => 'user', 'content' => $user ),
+		);
+
+		$polished = AIEH_OpenAI_Client::chat( $messages, array( 'max_tokens' => 700, 'temperature' => 0.4 ) );
+		if ( is_wp_error( $polished ) ) {
+			wp_send_json_error( array( 'message' => $polished->get_error_message() ) );
+		}
+
+		wp_send_json_success( array( 'body' => $polished ) );
 	}
 
 	/**
