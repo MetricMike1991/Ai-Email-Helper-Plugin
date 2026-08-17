@@ -39,7 +39,10 @@ class AIEH_Imap_Client {
 		} else {
 			$flags .= '/notls';
 		}
-		// SiteGround uses a valid cert; keep validate-cert on by default.
+		if ( empty( $s['imap_validate_cert'] ) ) {
+			// SiteGround mail certs are often issued for the server hostname, not the domain.
+			$flags .= '/novalidate-cert';
+		}
 		return '{' . $host . ':' . $port . $flags . '}' . $folder;
 	}
 

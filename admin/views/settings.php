@@ -51,6 +51,9 @@ $has_secret = static function ( $val ) {
 				<td><input name="imap_user" id="imap_user" type="text" class="regular-text" value="<?php echo esc_attr( $s['imap_user'] ); ?>" placeholder="you@yourdomain.com"></td></tr>
 			<tr><th><label for="imap_password"><?php esc_html_e( 'Password', 'ai-email-helper' ); ?></label></th>
 				<td><input name="imap_password" id="imap_password" type="password" class="regular-text" autocomplete="new-password" placeholder="<?php echo esc_attr( $has_secret( $s['imap_password'] ) ); ?>"></td></tr>
+			<tr><th><?php esc_html_e( 'SSL Certificate', 'ai-email-helper' ); ?></th>
+				<td><label><input name="imap_validate_cert" type="checkbox" value="1" <?php checked( (int) $s['imap_validate_cert'], 1 ); ?>> <?php esc_html_e( 'Validate SSL certificate', 'ai-email-helper' ); ?></label>
+				<p class="description"><?php esc_html_e( 'Uncheck this if you get a “certificate failure / hostname mismatch” error. On SiteGround the mail certificate is issued for the server hostname (e.g. gnldmXXXX.siteground.biz), not your domain, so validation must be turned off.', 'ai-email-helper' ); ?></p></td></tr>
 		</table>
 		<p><button type="button" class="button" id="aieh-test-imap"><?php esc_html_e( 'Test IMAP Connection', 'ai-email-helper' ); ?></button> <span class="aieh-inline-status" id="aieh-imap-status"></span></p>
 
@@ -74,6 +77,9 @@ $has_secret = static function ( $val ) {
 				<td><input name="from_name" id="from_name" type="text" class="regular-text" value="<?php echo esc_attr( $s['from_name'] ); ?>"></td></tr>
 			<tr><th><label for="from_email"><?php esc_html_e( 'From Email', 'ai-email-helper' ); ?></label></th>
 				<td><input name="from_email" id="from_email" type="email" class="regular-text" value="<?php echo esc_attr( $s['from_email'] ); ?>"></td></tr>
+			<tr><th><?php esc_html_e( 'SSL Certificate', 'ai-email-helper' ); ?></th>
+				<td><label><input name="smtp_validate_cert" type="checkbox" value="1" <?php checked( (int) $s['smtp_validate_cert'], 1 ); ?>> <?php esc_html_e( 'Validate SSL certificate', 'ai-email-helper' ); ?></label>
+				<p class="description"><?php esc_html_e( 'Uncheck this if sending fails with a certificate/hostname mismatch error (same SiteGround reason as IMAP above).', 'ai-email-helper' ); ?></p></td></tr>
 		</table>
 
 		<h2><?php esc_html_e( 'OpenAI', 'ai-email-helper' ); ?></h2>

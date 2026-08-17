@@ -30,11 +30,13 @@ class AIEH_Settings {
 			'imap_encryption'=> 'ssl', // ssl | tls | none
 			'imap_user'      => '',
 			'imap_password'  => '',
+			'imap_validate_cert' => 1,
 			'smtp_host'      => '',
 			'smtp_port'      => 465,
 			'smtp_encryption'=> 'ssl',
 			'smtp_user'      => '',
 			'smtp_password'  => '',
+			'smtp_validate_cert' => 1,
 			'from_email'     => '',
 			'from_name'      => '',
 			'openai_api_key' => '',

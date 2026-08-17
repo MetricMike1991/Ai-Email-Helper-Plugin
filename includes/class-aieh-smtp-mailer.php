@@ -52,6 +52,16 @@ class AIEH_Smtp_Mailer {
 				$mail->SMTPAutoTLS = false;
 			}
 
+			if ( empty( $s['smtp_validate_cert'] ) ) {
+				$mail->SMTPOptions = array(
+					'ssl' => array(
+						'verify_peer'       => false,
+						'verify_peer_name'  => false,
+						'allow_self_signed' => true,
+					),
+				);
+			}
+
 			$from_email = '' !== $s['from_email'] ? $s['from_email'] : $s['smtp_user'];
 			$from_name  = '' !== $s['from_name'] ? $s['from_name'] : $from_email;
 
